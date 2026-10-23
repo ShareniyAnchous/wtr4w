@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NebulaMind — Админ-панель</title>
+<style>
+/* NebulaMind admin — тот же стиль: #05070d + градиенты, стекло, сине-фиолетовые акценты */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  background: #05070d; color: #e6ecff; min-height: 100vh;
+}
+body::before {
+  content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(900px 600px at 10% -5%, rgba(77,124,255,0.18), transparent 60%),
+    radial-gradient(900px 700px at 95% 105%, rgba(160,107,255,0.16), transparent 60%);
+}
+.wrap { position: relative; z-index: 1; max-width: 1080px; margin: 0 auto; padding: 20px 16px 40px; }
+.topbar {
+  display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 16px;
+  background: rgba(15,21,39,0.72); backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; margin-bottom: 18px;
+}
+.brand { font-size: 17px; font-weight: 800; background: linear-gradient(90deg,#7ea2ff,#c39bff,#22d3ee);
+  -webkit-background-clip: text; background-clip: text; color: transparent; white-space: nowrap; }
+.badge { font-size: 11.5px; padding: 4px 10px; border-radius: 999px;
+  background: linear-gradient(135deg, rgba(77,124,255,0.25), rgba(160,107,255,0.25));
+  border: 1px solid rgba(127,140,255,0.35); color: #dbe4ff; white-space: nowrap; }
+.spacer { flex: 1; }
+.tb-btn {
+  padding: 7px 12px; border-radius: 10px; font-size: 13px; cursor: pointer; font-family: inherit;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10); color: #c3d0ef;
+  transition: background 0.15s, border 0.15s; white-space: nowrap;
+}
+.tb-btn:hover { background: rgba(77,124,255,0.16); border-color: rgba(77,124,255,0.35); }
+
+.tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.tab {
+  padding: 9px 16px; border-radius: 12px; font-size: 13.5px; font-weight: 600; cursor: pointer;
+  background: rgba(15,21,39,0.72); border: 1px solid rgba(255,255,255,0.08); color: #9fb0d8;
+  font-family: inherit; transition: all 0.15s;
+}
+.tab.active { color: #fff; background: linear-gradient(135deg, rgba(77,124,255,0.3), rgba(160,107,255,0.3));
+  border-color: rgba(127,140,255,0.45); box-shadow: 0 4px 16px rgba(90,110,255,0.2); }
+
+.panel {
+  background: rgba(15,21,39,0.72); backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 18px;
+}
+.hidden { display: none !important; }
+
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.stat-card {
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px; padding: 14px 16px;
+}
+.stat-num { font-size: 26px; font-weight: 800; color: #22d3ee; }
+.stat-lbl { font-size: 12px; color: #8fa0c8; margin-top: 3px; }
+.admins-line { margin-top: 14px; font-size: 13px; color: #b7c6ea; }
+.admins-line b { color: #d8c7ff; }
+
+input[type=text], select {
+  width: 100%; padding: 10px 12px; border-radius: 11px; font-size: 14px; font-family: inherit;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #eaf0ff; outline: none;
+}
+input:focus, select:focus { border-color: rgba(77,124,255,0.7); }
+.filter-row { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.filter-row input { flex: 1; min-width: 200px; }
+
+.user-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.user-card {
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 14px; padding: 14px; cursor: pointer; transition: all 0.15s;
+}
+.user-card:hover { border-color: rgba(127,140,255,0.5); background: rgba(77,124,255,0.08); transform: translateY(-1px); }
+.uc-name { font-weight: 700; font-size: 15px; color: #dbe4ff; display: flex; align-items: center; gap: 8px; }
+.uc-admin { font-size: 10px; padding: 2px 8px; border-radius: 999px; background: rgba(160,107,255,0.25); border: 1px solid rgba(160,107,255,0.5); color: #e2d4ff; }
+.uc-meta { font-size: 12px; color: #8fa0c8; margin-top: 6px; line-height: 1.5; }
+.uc-last { font-size: 12.5px; color: #b7c6ea; margin-top: 6px; padding: 7px 10px; border-radius: 9px; background: rgba(124,58,237,0.14); border: 1px solid rgba(167,139,250,0.25); word-break: break-word; }
+.uc-count { color: #22d3ee; font-weight: 700; }
+
+.msg-list { display: flex; flex-direction: column; gap: 10px; }
+.msg-item {
+  display: flex; gap: 10px; align-items: flex-start;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px; padding: 11px 13px;
+}
+.msg-user { font-weight: 700; color: #d8c7ff; font-size: 13px; white-space: nowrap; }
+.msg-text { flex: 1; font-size: 13.5px; color: #cfd9f2; word-break: break-word; white-space: pre-wrap; }
+.msg-time { font-size: 11px; color: #7487b3; white-space: nowrap; }
+.del-btn {
+  border: 1px solid rgba(255,90,120,0.4); background: rgba(255,90,120,0.12); color: #ffb3c4;
+  border-radius: 9px; padding: 5px 10px; font-size: 12px; cursor: pointer; font-family: inherit;
+  transition: background 0.15s;
+}
+.del-btn:hover { background: rgba(255,90,120,0.28); }
+
+.detail-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+.detail-head h3 { font-size: 17px; color: #dbe4ff; }
+.bio-line { font-size: 13px; color: #aab9dd; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 9px 12px; margin-bottom: 12px; }
+
+.toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(20px);
+  background: rgba(15,21,39,0.92); border: 1px solid rgba(34,211,238,0.5); color: #a9f3ff;
+  padding: 10px 18px; border-radius: 12px; font-size: 13px; z-index: 99; opacity: 0;
+  transition: all 0.25s ease; pointer-events: none; max-width: 80vw; text-align: center;
+}
+.toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast.err { border-color: rgba(255,120,150,0.5); color: #ffd7e0; }
+.empty { color: #5f6f95; font-size: 13.5px; padding: 14px 4px; }
+.muted { color: #7487b3; font-size: 12.5px; margin-bottom: 10px; }
+@media (max-width: 760px) { .topbar { flex-wrap: wrap; height: auto; padding: 10px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <span class="brand">⚙ NebulaMind Admin</span>
+    <span class="badge" id="meBadge">—</span>
+    <span class="spacer"></span>
+    <button class="tb-btn" id="backBtn">← В чат</button>
+    <button class="tb-btn" id="logoutBtn">Выйти</button>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="stats" type="button">📈 Статистика</button>
+    <button class="tab" data-tab="users" type="button">👥 Пользователи</button>
+    <button class="tab" data-tab="messages" type="button">💬 Все сообщения</button>
+  </div>
+
+  <!-- ======================= СТАТИСТИКА ======================= -->
+  <section class="panel" id="tab-stats">
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-num" id="stUsers">…</div><div class="stat-lbl">Всего пользователей</div></div>
+      <div class="stat-card"><div class="stat-num" id="stMsgs">…</div><div class="stat-lbl">Всего сообщений</div></div>
+      <div class="stat-card"><div class="stat-num" id="stToday">…</div><div class="stat-lbl">Сообщений сегодня</div></div>
+      <div class="stat-card"><div class="stat-num" id="stProfiles">…</div><div class="stat-lbl">Заполненных профилей</div></div>
+      <div class="stat-card"><div class="stat-num" id="stOnline">…</div><div class="stat-lbl">Сокетов онлайн</div></div>
+    </div>
+    <div class="admins-line">Администраторы: <b id="stAdmins">…</b></div>
+  </section>
+
+  <!-- ====================== ПОЛЬЗОВАТЕЛИ ====================== -->
+  <section class="panel hidden" id="tab-users">
+    <div id="usersList">
+      <div class="filter-row">
+        <input type="text" id="userSearch" placeholder="🔍 Поиск по логину…" />
+      </div>
+      <div class="user-grid" id="userGrid"></div>
+      <div class="empty hidden" id="usersEmpty">Ничего не найдено.</div>
+    </div>
+
+    <!-- Карточка пользователя: профиль + вся переписка -->
+    <div id="userDetail" class="hidden">
+      <div class="detail-head">
+        <button class="tb-btn" id="detailBack">← Назад к списку</button>
+        <h3 id="detailName"></h3>
+        <span class="badge" id="detailCount"></span>
+      </div>
+      <div class="bio-line" id="detailBio"></div>
+      <div class="msg-list" id="detailMsgs"></div>
+    </div>
+  </section>
+
+  <!-- ===================== ВСЕ СООБЩЕНИЯ ====================== -->
+  <section class="panel hidden" id="tab-messages">
+    <div class="filter-row">
+      <select id="msgUserFilter"><option value="">Все пользователи</option></select>
+      <input type="text" id="msgTextFilter" placeholder="🔍 Фильтр по тексту…" />
+    </div>
+    <div class="muted" id="msgsMeta"></div>
+    <div class="msg-list" id="allMsgs"></div>
+    <div class="empty hidden" id="msgsEmpty">Сообщений нет.</div>
+  </section>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function toast(text, isErr) {
+    var t = document.getElementById('toast');
+    t.textContent = text;
+    t.className = 'toast on' + (isErr ? ' err' : '');
+    clearTimeout(t._tm);
+    t._tm = setTimeout(function () { t.className = 'toast' + (isErr ? ' err' : ''); }, 3200);
+  }
+
+  async function api(url, opts) {
+    try {
+      var res = await fetch(url, Object.assign({ credentials: 'same-origin' }, opts || {}));
+      var data = await res.json().catch(function () { return {}; });
+      if (!res.ok) throw new Error(data.error || ('Ошибка ' + res.status));
+      return data;
+    } catch (e) {
+      toast(e.message || 'Сетевая ошибка', true);
+      throw e;
+    }
+  }
+
+  function fmtDT(iso) {
+    try {
+      var d = new Date(iso);
+      return d.toLocaleDateString('ru-RU') + ' ' + d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    } catch (e) { return ''; }
+  }
+
+  var ME = null;
+  var allUsers = [];
+  var allMessages = [];
+
+  /* ------------------------------ Вкладки ------------------------------ */
+  document.querySelectorAll('.tab').forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      document.querySelectorAll('.tab').forEach(function (t) { t.classList.remove('active'); });
+      tab.classList.add('active');
+      ['stats', 'users', 'messages'].forEach(function (id) {
+        document.getElementById('tab-' + id).classList.toggle('hidden', id !== tab.getAttribute('data-tab'));
+      });
+      showUserList();
+      if (tab.getAttribute('data-tab') === 'stats') loadStats();
+      if (tab.getAttribute('data-tab') === 'users') loadUsers();
+      if (tab.getAttribute('data-tab') === 'messages') loadMessages();
+    });
+  });
+
+  /* ---------------------------- Статистика ----------------------------- */
+  async function loadStats() {
+    var s = await api('/api/admin/stats');
+    document.getElementById('stUsers').textContent = s.totalUsers;
+    document.getElementById('stMsgs').textContent = s.totalMessages;
+    document.getElementById('stToday').textContent = s.todayMessages;
+    document.getElementById('stProfiles').textContent = s.filledProfiles;
+    document.getElementById('stOnline').textContent = s.online;
+    document.getElementById('stAdmins').textContent = (s.admins || []).join(', ') || '—';
+  }
+
+  /* --------------------------- Пользователи ---------------------------- */
+  async function loadUsers() {
+    allUsers = await api('/api/admin/users');
+    renderUsers();
+  }
+
+  function renderUsers() {
+    var q = document.getElementById('userSearch').value.trim().toLowerCase();
+    var grid = document.getElementById('userGrid');
+    grid.innerHTML = '';
+    var list = allUsers.filter(function (u) { return !q || u.username.toLowerCase().includes(q); });
+    document.getElementById('usersEmpty').classList.toggle('hidden', list.length > 0);
+    list.forEach(function (u) {
+      var card = document.createElement('div');
+      card.className = 'user-card';
+      card.innerHTML =
+        '<div class="uc-name">' + escapeHtml(u.username) +
+          (u.isAdmin ? ' <span class="uc-admin">admin</span>' : '') + '</div>' +
+        '<div class="uc-meta">Сообщений: <span class="uc-count">' + u.messageCount + '</span> · регистрация: ' +
+          escapeHtml(fmtDT(u.createdAt)) + (u.status ? '<br/>статус: ' + escapeHtml(u.status) : '') + '</div>' +
+        (u.lastMessage
+          ? '<div class="uc-last">💬 ' + escapeHtml(u.lastMessage.text) + '<br/><span style="color:#7487b3;font-size:11px">' + escapeHtml(fmtDT(u.lastMessage.time)) + '</span></div>'
+          : '<div class="uc-meta" style="margin-top:8px;color:#5f6f95">сообщений пока нет</div>');
+      card.addEventListener('click', function () { openUser(u.username); });
+      grid.appendChild(card);
+    });
+  }
+
+  document.getElementById('userSearch').addEventListener('input', renderUsers);
+
+  function showUserList() {
+    document.getElementById('usersList').classList.remove('hidden');
+    document.getElementById('userDetail').classList.add('hidden');
+  }
+  document.getElementById('detailBack').addEventListener('click', showUserList);
+
+  async function openUser(username) {
+    document.getElementById('usersList').classList.add('hidden');
+    document.getElementById('userDetail').classList.remove('hidden');
+    document.getElementById('detailName').textContent = username;
+    var msgs = await api('/api/admin/messages?user=' + encodeURIComponent(username));
+    document.getElementById('detailCount').textContent = 'сообщений: ' + msgs.length;
+    var prof = null;
+    try { prof = await api('/api/profile/' + encodeURIComponent(username)); } catch (e) { /* уже показано */ }
+    document.getElementById('detailBio').innerHTML = prof
+      ? '<b>Био:</b> ' + (escapeHtml(prof.bio) || '<i style="color:#5f6f95">пусто</i>') +
+        '<br/><b>Статус:</b> ' + (escapeHtml(prof.status) || '<i style="color:#5f6f95">пусто</i>')
+      : 'Профиль не загружен.';
+    renderMsgList(document.getElementById('detailMsgs'), msgs);
+  }
+
+  /* --------------------------- Сообщения ------------------------------- */
+  async function loadMessages() {
+    allMessages = await api('/api/admin/messages');
+    var sel = document.getElementById('msgUserFilter');
+    var cur = sel.value;
+    sel.innerHTML = '<option value="">Все пользователи</option>';
+    var names = Array.from(new Set(allMessages.map(function (m) { return m.user; }))).sort();
+    names.forEach(function (n) {
+      var o = document.createElement('option');
+      o.value = n; o.textContent = n;
+      sel.appendChild(o);
+    });
+    sel.value = cur;
+    renderAllMessages();
+  }
+
+  function renderMsgList(container, msgs) {
+    container.innerHTML = '';
+    if (!msgs.length) {
+      container.innerHTML = '<div class="empty">Сообщений нет.</div>';
+      return;
+    }
+    msgs.slice().reverse().forEach(function (m) {
+      var row = document.createElement('div');
+      row.className = 'msg-item';
+      row.innerHTML =
+        '<span class="msg-user">' + escapeHtml(m.user) + '</span>' +
+        '<span class="msg-text">' + escapeHtml(m.text) + '</span>' +
+        '<span class="msg-time">#' + m.id + ' · ' + escapeHtml(fmtDT(m.time)) + '</span>';
+      var del = document.createElement('button');
+      del.className = 'del-btn';
+      del.textContent = '✕ удалить';
+      del.addEventListener('click', async function () {
+        if (!confirm('Удалить сообщение #' + m.id + '?')) return;
+        try {
+          await api('/api/admin/message/' + m.id, { method: 'DELETE' });
+          toast('Сообщение #' + m.id + ' удалено');
+          row.remove();
+          // синхронизируем локальные данные
+          allMessages = allMessages.filter(function (x) { return x.id !== m.id; });
+        } catch (e) { /* toast в api */ }
+      });
+      row.appendChild(del);
+      container.appendChild(row);
+    });
+  }
+
+  function renderAllMessages() {
+    var user = document.getElementById('msgUserFilter').value;
+    var q = document.getElementById('msgTextFilter').value.trim().toLowerCase();
+    var list = allMessages.filter(function (m) {
+      return (!user || m.user === user) && (!q || String(m.text).toLowerCase().includes(q));
+    });
+    document.getElementById('msgsMeta').textContent = 'Показано: ' + list.length + ' из ' + allMessages.length;
+    document.getElementById('msgsEmpty').classList.toggle('hidden', list.length > 0);
+    renderMsgList(document.getElementById('allMsgs'), list);
+  }
+
+  document.getElementById('msgUserFilter').addEventListener('change', renderAllMessages);
+  document.getElementById('msgTextFilter').addEventListener('input', renderAllMessages);
+
+  /* ------------------------------ Топбар ------------------------------- */
+  document.getElementById('backBtn').addEventListener('click', function () { window.location.href = '/'; });
+  document.getElementById('logoutBtn').addEventListener('click', async function () {
+    try { await api('/api/logout', { method: 'POST' }); window.location.href = '/login.html'; } catch (e) {}
+  });
+
+  /* ------------------------------- Старт ------------------------------- */
+  api('/api/me').then(function (me) {
+    if (!me.loggedIn) { window.location.href = '/login.html'; return; }
+    if (!me.isAdmin) { window.location.href = '/'; return; } // сервер и так защитит /admin
+    ME = me;
+    document.getElementById('meBadge').textContent = '👤 ' + me.username + ' · admin';
+    loadStats().catch(function () {});
+  }).catch(function () { window.location.href = '/login.html'; });
+})();
+</script>
+</body>
+</html>

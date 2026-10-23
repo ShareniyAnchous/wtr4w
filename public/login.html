@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NebulaMind — Вход</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+    background: #05070d;
+    color: #e6ecff;
+    display: flex; align-items: center; justify-content: center;
+    position: relative; overflow: hidden;
+  }
+  body::before {
+    content: '';
+    position: fixed; inset: 0; pointer-events: none;
+    background:
+      radial-gradient(900px 600px at 12% -5%, rgba(77,124,255,0.22), transparent 60%),
+      radial-gradient(900px 700px at 95% 105%, rgba(160,107,255,0.20), transparent 60%);
+  }
+  .stars { position: fixed; inset: 0; pointer-events: none; }
+  .card {
+    position: relative; z-index: 2;
+    width: min(420px, calc(100vw - 32px));
+    background: rgba(15,21,39,0.72);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 20px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 30px 80px rgba(0,0,0,0.55);
+    padding: 28px 26px 26px;
+  }
+  .logo-row { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+  .logo-orb {
+    width: 44px; height: 44px; border-radius: 14px; flex: 0 0 auto;
+    background: linear-gradient(135deg, #4d7cff, #a06bff);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 24px rgba(120,110,255,0.45);
+    font-size: 22px;
+  }
+  h1 {
+    font-size: 24px; font-weight: 700; letter-spacing: 0.3px;
+    background: linear-gradient(90deg, #7ea2ff, #c39bff);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .subtitle { color: #8fa0c8; font-size: 13px; margin: 4px 0 20px; }
+  .tabs { display: flex; gap: 6px; background: rgba(255,255,255,0.05); border-radius: 12px; padding: 4px; margin-bottom: 20px; }
+  .tab {
+    flex: 1; text-align: center; padding: 9px 0; border-radius: 9px; cursor: pointer;
+    font-size: 14px; font-weight: 600; color: #9fb0d8; border: none; background: transparent;
+    transition: all 0.18s ease; font-family: inherit;
+  }
+  .tab.active {
+    background: linear-gradient(135deg, rgba(77,124,255,0.28), rgba(160,107,255,0.28));
+    color: #fff; box-shadow: 0 4px 14px rgba(90,110,255,0.25);
+  }
+  label { display: block; font-size: 12px; color: #8fa0c8; margin: 14px 0 6px; }
+  input[type=text], input[type=password] {
+    width: 100%; padding: 12px 14px; border-radius: 12px; font-size: 15px;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10);
+    color: #eaf0ff; outline: none; transition: border 0.18s, box-shadow 0.18s; font-family: inherit;
+  }
+  input:focus { border-color: rgba(77,124,255,0.7); box-shadow: 0 0 0 3px rgba(77,124,255,0.18); }
+  .btn {
+    width: 100%; margin-top: 22px; padding: 13px; border: none; border-radius: 12px;
+    font-size: 15px; font-weight: 700; color: #fff; cursor: pointer; font-family: inherit;
+    background: linear-gradient(135deg, #4d7cff, #a06bff);
+    box-shadow: 0 8px 24px rgba(110,110,255,0.35);
+    transition: transform 0.12s, filter 0.12s;
+  }
+  .btn:hover { filter: brightness(1.12); }
+  .btn:active { transform: translateY(1px) scale(0.99); }
+  .btn:disabled { opacity: 0.55; cursor: default; }
+  .msg { margin-top: 14px; font-size: 13px; min-height: 18px; text-align: center; }
+  .msg.err { color: #ff7b9c; }
+  .msg.ok { color: #22d3ee; }
+  .hint { margin-top: 18px; font-size: 11.5px; color: #5f6f95; text-align: center; line-height: 1.5; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<canvas class="stars" id="stars"></canvas>
+
+<div class="card">
+  <div class="logo-row">
+    <div class="logo-orb">🧠</div>
+    <h1>NebulaMind</h1>
+  </div>
+  <div class="subtitle">Нейро-чат с математикой, графиками и 3D</div>
+
+  <div class="tabs">
+    <button class="tab active" id="tabLogin" type="button">Вход</button>
+    <button class="tab" id="tabReg" type="button">Регистрация</button>
+  </div>
+
+  <form id="loginForm" autocomplete="on">
+    <label for="li_user">Логин</label>
+    <input id="li_user" type="text" placeholder="Например, Maks" autocomplete="username" />
+    <label for="li_pass">Пароль</label>
+    <input id="li_pass" type="password" placeholder="••••••••" autocomplete="current-password" />
+    <button class="btn" type="submit" id="li_btn">Войти</button>
+  </form>
+
+  <form id="regForm" class="hidden" autocomplete="off">
+    <label for="rg_user">Логин (минимум 2 символа)</label>
+    <input id="rg_user" type="text" placeholder="Придумайте логин" autocomplete="username" />
+    <label for="rg_pass">Пароль (минимум 4 символа)</label>
+    <input id="rg_pass" type="password" placeholder="Придумайте пароль" autocomplete="new-password" />
+    <label for="rg_pass2">Повторите пароль</label>
+    <input id="rg_pass2" type="password" placeholder="Ещё раз" autocomplete="new-password" />
+    <button class="btn" type="submit" id="rg_btn">Создать аккаунт</button>
+  </form>
+
+  <div class="msg" id="msg"></div>
+  <div class="hint">Демо-доступ администратора уже создан на сервере.<br/>NebulaMind · локальный проект · без внешних API-ключей</div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var tabLogin = document.getElementById('tabLogin');
+  var tabReg = document.getElementById('tabReg');
+  var loginForm = document.getElementById('loginForm');
+  var regForm = document.getElementById('regForm');
+  var msgEl = document.getElementById('msg');
+
+  function setMsg(text, cls) {
+    msgEl.textContent = text || '';
+    msgEl.className = 'msg ' + (cls || '');
+  }
+
+  tabLogin.addEventListener('click', function () {
+    tabLogin.classList.add('active'); tabReg.classList.remove('active');
+    loginForm.classList.remove('hidden'); regForm.classList.add('hidden');
+    setMsg('');
+  });
+  tabReg.addEventListener('click', function () {
+    tabReg.classList.add('active'); tabLogin.classList.remove('active');
+    regForm.classList.remove('hidden'); loginForm.classList.add('hidden');
+    setMsg('');
+  });
+
+  async function api(path, body, btn) {
+    if (btn) btn.disabled = true;
+    try {
+      var res = await fetch(path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify(body),
+      });
+      var data = await res.json().catch(function () { return {}; });
+      if (!res.ok) throw new Error(data.error || ('Ошибка сервера (' + res.status + ')'));
+      return data;
+    } catch (e) {
+      throw new Error(e.message || 'Сетевая ошибка');
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  loginForm.addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    setMsg('');
+    api('/api/login', {
+      username: document.getElementById('li_user').value,
+      password: document.getElementById('li_pass').value,
+    }, document.getElementById('li_btn'))
+      .then(function () { window.location.href = '/'; })
+      .catch(function (e) { setMsg(e.message, 'err'); });
+  });
+
+  regForm.addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    setMsg('');
+    var p1 = document.getElementById('rg_pass').value;
+    var p2 = document.getElementById('rg_pass2').value;
+    if (p1 !== p2) { setMsg('Пароли не совпадают', 'err'); return; }
+    api('/api/register', {
+      username: document.getElementById('rg_user').value,
+      password: p1,
+    }, document.getElementById('rg_btn'))
+      .then(function () { setMsg('Аккаунт создан, перенаправление…', 'ok'); setTimeout(function () { window.location.href = '/'; }, 600); })
+      .catch(function (e) { setMsg(e.message, 'err'); });
+  });
+
+  // Если уже авторизован — сразу на чат.
+  fetch('/api/me', { credentials: 'same-origin' })
+    .then(function (r) { return r.json(); })
+    .then(function (d) { if (d && d.loggedIn) window.location.href = '/'; })
+    .catch(function () {});
+
+  // Фоновые «звёзды»
+  var cv = document.getElementById('stars');
+  var ctx = cv.getContext('2d');
+  var stars = [];
+  function resize() {
+    cv.width = innerWidth; cv.height = innerHeight;
+    stars = [];
+    for (var i = 0; i < 90; i++) {
+      stars.push({ x: Math.random() * cv.width, y: Math.random() * cv.height, r: Math.random() * 1.4 + 0.3, a: Math.random(), s: Math.random() * 0.02 + 0.004 });
+    }
+  }
+  function tick() {
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    for (var i = 0; i < stars.length; i++) {
+      var st = stars[i];
+      st.a += st.s;
+      var al = 0.25 + 0.55 * Math.abs(Math.sin(st.a));
+      ctx.globalAlpha = al;
+      ctx.fillStyle = i % 3 === 0 ? '#a06bff' : (i % 3 === 1 ? '#4d7cff' : '#cfe0ff');
+      ctx.beginPath(); ctx.arc(st.x, st.y, st.r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    requestAnimationFrame(tick);
+  }
+  addEventListener('resize', resize);
+  resize(); tick();
+})();
+</script>
+</body>
+</html>
