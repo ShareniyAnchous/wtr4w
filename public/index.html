@@ -1,0 +1,1545 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NebulaMind — Чат</title>
+
+<!-- Import-map для модульного Three.js (CDN, без сборки) -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<style>
+/* ==========================================================================
+   NebulaMind — тёмная неоновая тема: фон #05070d + радиальные градиенты
+   (синий #4d7cff сверху слева, фиолетовый #a06bff снизу справа),
+   стеклянные панели rgba(15,21,39,0.72)+blur(20px), границы rgba(255,255,255,.08),
+   акценты #4d7cff → #a06bff, циан #22d3ee для результатов. Шрифт Inter/Segoe UI.
+   ========================================================================== */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  background: #05070d;
+  color: #e6ecff;
+  overflow: hidden;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(1000px 700px at 8% -10%, rgba(77,124,255,0.20), transparent 60%),
+    radial-gradient(1000px 800px at 100% 110%, rgba(160,107,255,0.18), transparent 60%);
+}
+#fxCanvas { position: fixed; inset: 0; z-index: 1; pointer-events: none; }
+
+.app { position: relative; z-index: 2; display: flex; height: 100vh; }
+
+/* ------------------------------- Сайдбар -------------------------------- */
+.sidebar {
+  width: 250px; flex: 0 0 auto; display: flex; flex-direction: column;
+  background: rgba(15,21,39,0.72);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  border-right: 1px solid rgba(255,255,255,0.08);
+  padding: 16px 12px 12px;
+  overflow-y: auto;
+}
+.brand { display: flex; align-items: center; gap: 10px; padding: 0 6px 14px; }
+#logoCanvas { width: 40px; height: 40px; flex: 0 0 auto; }
+.brand-name {
+  font-size: 18px; font-weight: 800; letter-spacing: 0.4px;
+  background: linear-gradient(90deg, #7ea2ff, #c39bff, #22d3ee);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.side-section { margin-bottom: 12px; }
+.side-title { font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; color: #6f81ab; padding: 4px 8px; }
+.qbtn {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  padding: 8px 10px; margin: 2px 0; border-radius: 10px; cursor: pointer;
+  background: transparent; border: 1px solid transparent;
+  color: #c3d0ef; font-size: 13px; font-family: inherit; text-align: left;
+  transition: background 0.15s, border 0.15s, transform 0.1s;
+}
+.qbtn:hover { background: rgba(77,124,255,0.12); border-color: rgba(77,124,255,0.25); }
+.qbtn:active { transform: scale(0.98); }
+.qbtn .ico { width: 20px; text-align: center; flex: 0 0 auto; filter: saturate(1.2); }
+.side-status {
+  margin-top: auto; padding: 10px 12px; border-radius: 12px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
+  font-size: 12.5px; color: #9fb0d8; display: flex; align-items: center; gap: 8px;
+}
+.dot { width: 9px; height: 9px; border-radius: 50%; background: #34d399; box-shadow: 0 0 10px #34d399; animation: pulse 1.6s infinite; flex: 0 0 auto; }
+@keyframes pulse { 0%,100% { opacity: 1; transform: scale(1);} 50% { opacity: 0.45; transform: scale(0.8);} }
+
+/* -------------------------------- Топбар -------------------------------- */
+.main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.topbar {
+  height: 56px; flex: 0 0 auto; display: flex; align-items: center; gap: 10px;
+  padding: 0 16px;
+  background: rgba(15,21,39,0.72);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.tb-title { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.badge {
+  font-size: 11.5px; padding: 4px 10px; border-radius: 999px; white-space: nowrap;
+  background: linear-gradient(135deg, rgba(77,124,255,0.25), rgba(160,107,255,0.25));
+  border: 1px solid rgba(127,140,255,0.35); color: #dbe4ff;
+}
+.badge.online-b { background: rgba(52,211,153,0.14); border-color: rgba(52,211,153,0.4); color: #6ee7b7; }
+.tb-spacer { flex: 1; }
+.tb-btn {
+  padding: 7px 12px; border-radius: 10px; font-size: 13px; cursor: pointer; font-family: inherit;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10); color: #c3d0ef;
+  transition: background 0.15s, border 0.15s;
+  white-space: nowrap;
+}
+.tb-btn:hover { background: rgba(77,124,255,0.16); border-color: rgba(77,124,255,0.35); }
+.tb-btn.danger:hover { background: rgba(255,90,120,0.15); border-color: rgba(255,90,120,0.4); }
+.hidden { display: none !important; }
+
+/* ------------------------------ Лента чата ------------------------------ */
+.feed {
+  flex: 1; overflow-y: auto; padding: 22px 16px 12px;
+  scrollbar-width: thin; scrollbar-color: rgba(120,130,200,0.35) transparent;
+}
+.feed::-webkit-scrollbar { width: 8px; }
+.feed::-webkit-scrollbar-thumb { background: rgba(120,130,200,0.3); border-radius: 8px; }
+.inner { max-width: 780px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+
+.msg-row { display: flex; gap: 10px; align-items: flex-start; }
+.msg-row.user { justify-content: flex-end; }
+.avatar {
+  width: 34px; height: 34px; border-radius: 10px; flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 700; color: #fff; overflow: hidden;
+}
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+.avatar.user-a { background: linear-gradient(135deg, #4d7cff, #a06bff); box-shadow: 0 4px 14px rgba(110,110,255,0.35); }
+.avatar.ai-a {
+  background: rgba(15,21,39,0.85); border: 1px solid rgba(34,211,238,0.4);
+  color: #22d3ee; font-size: 16px; box-shadow: 0 0 14px rgba(34,211,238,0.18);
+}
+.avatar.other-a { background: linear-gradient(135deg, #7c3aed, #a06bff); }
+.bubble-wrap { max-width: 78%; min-width: 0; }
+.bubble {
+  padding: 10px 14px; font-size: 14.5px; line-height: 1.55; word-wrap: break-word; overflow-wrap: anywhere;
+  background: rgba(15,21,39,0.72); backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+.msg-row.user .bubble {
+  background: linear-gradient(135deg, rgba(77,124,255,0.28), rgba(160,107,255,0.24));
+  border-color: rgba(127,140,255,0.35);
+  border-radius: 16px 16px 4px 16px;
+}
+.msg-row.ai .bubble {
+  border-color: rgba(34,211,238,0.28);
+  border-radius: 4px 16px 16px 16px;
+  box-shadow: 0 6px 22px rgba(0,0,0,0.35);
+}
+.msg-row.other .bubble {
+  background: rgba(124,58,237,0.30);
+  border-color: rgba(167,139,250,0.45);
+  border-radius: 4px 16px 16px 16px;
+}
+.sender { font-size: 12px; font-weight: 700; color: #d8c7ff; margin-bottom: 4px; }
+.meta { font-size: 10.5px; color: #7487b3; margin-top: 5px; text-align: right; }
+.bubble pre.codeblk {
+  background: rgba(5,8,18,0.8); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px; padding: 10px 12px; margin: 8px 0; overflow-x: auto;
+  font-family: 'Cascadia Code', Consolas, monospace; font-size: 13px; color: #9feaf9;
+  white-space: pre-wrap;
+}
+.bubble .res { color: #22d3ee; font-weight: 700; }
+.bubble .step { color: #b7c6ea; }
+.bubble table.dt { border-collapse: collapse; margin: 10px 0; width: 100%; font-size: 13px; }
+.bubble table.dt th, .bubble table.dt td { border: 1px solid rgba(255,255,255,0.12); padding: 6px 10px; text-align: left; }
+.bubble table.dt th { background: rgba(77,124,255,0.18); color: #dbe4ff; }
+.bubble table.dt tr:nth-child(even) td { background: rgba(255,255,255,0.03); }
+.csv-btn {
+  display: inline-block; margin-top: 6px; padding: 7px 12px; border-radius: 9px; cursor: pointer;
+  font-size: 12.5px; font-weight: 600; color: #05202a; border: none; font-family: inherit;
+  background: linear-gradient(135deg, #22d3ee, #6ee7b7);
+  box-shadow: 0 4px 14px rgba(34,211,238,0.3);
+}
+.csv-btn:hover { filter: brightness(1.1); }
+.gcanvas { display: block; margin: 10px 0 4px; border-radius: 12px; background: rgba(5,8,18,0.85); border: 1px solid rgba(34,211,238,0.25); max-width: 100%; }
+.scene3d {
+  position: relative; margin: 10px 0 4px; border-radius: 12px; overflow: hidden;
+  border: 1px solid rgba(160,107,255,0.35); background: #070a14;
+}
+.scene3d canvas { display: block; }
+.scene3d .hint3d { position: absolute; left: 8px; bottom: 6px; font-size: 10.5px; color: #8fa0c8; pointer-events: none; text-shadow: 0 1px 3px #000; }
+.search-link { color: #9feaf9; text-decoration: none; border-bottom: 1px dashed rgba(34,211,238,0.5); }
+.search-link:hover { color: #22d3ee; }
+.search-item { margin: 8px 0; }
+.search-item .snip { color: #aab9dd; font-size: 13px; }
+
+/* --------------------------- Индикатор печати --------------------------- */
+.typing-row { display: none; }
+.typing-row.on { display: flex; }
+.dots { display: flex; gap: 5px; padding: 12px 16px; border-radius: 4px 16px 16px 16px;
+  background: rgba(15,21,39,0.72); border: 1px solid rgba(34,211,238,0.25); }
+.dots span { width: 8px; height: 8px; border-radius: 50%; animation: bounce 1.2s infinite; }
+.dots span:nth-child(1) { background: #4d7cff; animation-delay: 0s; }
+.dots span:nth-child(2) { background: #a06bff; animation-delay: 0.15s; }
+.dots span:nth-child(3) { background: #22d3ee; animation-delay: 0.3s; }
+@keyframes bounce { 0%,60%,100% { transform: translateY(0);} 30% { transform: translateY(-7px);} }
+
+/* -------------------------------- Ввод ---------------------------------- */
+.composer { flex: 0 0 auto; padding: 12px 16px 16px; }
+.composer-inner {
+  max-width: 780px; margin: 0 auto; display: flex; align-items: flex-end; gap: 10px;
+  background: rgba(15,21,39,0.72); backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 8px 8px 8px 14px;
+  transition: border 0.18s, box-shadow 0.18s;
+}
+.composer-inner.focused { border-color: rgba(77,124,255,0.6); box-shadow: 0 0 0 3px rgba(77,124,255,0.15), 0 10px 30px rgba(0,0,0,0.35); }
+#input {
+  flex: 1; resize: none; border: none; outline: none; background: transparent;
+  color: #eaf0ff; font-family: inherit; font-size: 14.5px; line-height: 1.5;
+  max-height: 120px; min-height: 24px; padding: 6px 0;
+}
+#input::placeholder { color: #5f6f95; }
+.send-btn {
+  width: 38px; height: 38px; border-radius: 12px; border: none; cursor: pointer; flex: 0 0 auto;
+  background: linear-gradient(135deg, #4d7cff, #a06bff); color: #fff; font-size: 17px;
+  box-shadow: 0 6px 18px rgba(110,110,255,0.4);
+  transition: transform 0.12s, filter 0.12s;
+  display: flex; align-items: center; justify-content: center;
+}
+.send-btn:hover { filter: brightness(1.15); }
+.send-btn:active { transform: scale(0.93); }
+
+/* ----------------------------- Модалка профиля -------------------------- */
+.overlay {
+  position: fixed; inset: 0; z-index: 50; display: none; align-items: center; justify-content: center;
+  background: rgba(3,5,10,0.6); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+.overlay.on { display: flex; }
+.modal {
+  width: min(440px, calc(100vw - 32px));
+  background: rgba(15,21,39,0.9); border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 18px; padding: 22px; box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+}
+.modal h3 { font-size: 17px; margin-bottom: 4px; background: linear-gradient(90deg,#7ea2ff,#c39bff);
+  -webkit-background-clip: text; background-clip: text; color: transparent; }
+.modal .sub { font-size: 12px; color: #7487b3; margin-bottom: 14px; }
+.modal label { display: block; font-size: 12px; color: #8fa0c8; margin: 12px 0 5px; }
+.modal input[type=text], .modal textarea {
+  width: 100%; padding: 10px 12px; border-radius: 10px; font-size: 14px; font-family: inherit;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #eaf0ff; outline: none;
+}
+.modal textarea { min-height: 74px; resize: vertical; }
+.modal input:focus, .modal textarea:focus { border-color: rgba(77,124,255,0.7); }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+.merr { color: #ff7b9c; font-size: 12.5px; margin-top: 10px; min-height: 16px; }
+
+.toast {
+  position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(20px);
+  background: rgba(15,21,39,0.92); border: 1px solid rgba(255,120,150,0.5); color: #ffd7e0;
+  padding: 10px 18px; border-radius: 12px; font-size: 13px; z-index: 99; opacity: 0;
+  transition: all 0.25s ease; pointer-events: none; max-width: 80vw; text-align: center;
+}
+.toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ------------------------------- Адаптив -------------------------------- */
+@media (max-width: 760px) {
+  .sidebar { display: none; }
+  .tb-title { max-width: 120px; }
+}
+</style>
+</head>
+<body>
+
+<canvas id="fxCanvas"></canvas>
+
+<div class="app">
+  <!-- ============================ САЙДБАР ============================ -->
+  <aside class="sidebar">
+    <div class="brand">
+      <canvas id="logoCanvas" width="80" height="80"></canvas>
+      <div class="brand-name">NebulaMind</div>
+    </div>
+
+    <div class="side-section">
+      <div class="side-title">Данные</div>
+      <button class="qbtn" data-cmd="таблица бюджет"><span class="ico">📊</span>Таблица бюджета</button>
+      <button class="qbtn" data-cmd="таблица оценки"><span class="ico">🎓</span>Таблица оценок</button>
+      <button class="qbtn" data-cmd="таблица население"><span class="ico">🌍</span>Таблица населения</button>
+      <button class="qbtn" data-cmd="поиск нейросети"><span class="ico">🔎</span>Веб-поиск</button>
+    </div>
+
+    <div class="side-section">
+      <div class="side-title">3D</div>
+      <button class="qbtn" data-cmd="3D куб"><span class="ico">🧊</span>Куб</button>
+      <button class="qbtn" data-cmd="3D сфера"><span class="ico">🌐</span>Сфера</button>
+      <button class="qbtn" data-cmd="3D цилиндр"><span class="ico">🥫</span>Цилиндр</button>
+      <button class="qbtn" data-cmd="3D конус"><span class="ico">🍦</span>Конус</button>
+      <button class="qbtn" data-cmd="3D тор"><span class="ico">🍩</span>Тор</button>
+    </div>
+
+    <div class="side-section">
+      <div class="side-title">Алгебра</div>
+      <button class="qbtn" data-cmd="реши 5(x-3)=2x+6"><span class="ico">➗</span>Линейное уравнение</button>
+      <button class="qbtn" data-cmd="реши x^2-5x+6=0"><span class="ico">🟡</span>Квадратное уравнение</button>
+      <button class="qbtn" data-cmd="формулы сокращенного умножения"><span class="ico">📐</span>Формулы</button>
+    </div>
+
+    <div class="side-section">
+      <div class="side-title">Геометрия</div>
+      <button class="qbtn" data-cmd="площадь круга"><span class="ico">⭕</span>Площадь круга</button>
+      <button class="qbtn" data-cmd="теорема пифагора"><span class="ico">📏</span>Теорема Пифагора</button>
+    </div>
+
+    <div class="side-section">
+      <div class="side-title">Функции</div>
+      <button class="qbtn" data-cmd="график sin(x) от -6.28 до 6.28"><span class="ico">〰️</span>График sin(x)</button>
+      <button class="qbtn" data-cmd="график x^2 от -5 до 5"><span class="ico">🏹</span>График x²</button>
+      <button class="qbtn" data-cmd="производная x^2"><span class="ico">∂</span>Производная</button>
+      <button class="qbtn" data-cmd="интеграл x^2 от 0 до 3"><span class="ico">∫</span>Интеграл</button>
+      <button class="qbtn" data-cmd="sin(x) при x=1"><span class="ico">🎯</span>Значение функции</button>
+    </div>
+
+    <div class="side-status"><span class="dot"></span>Онлайн · Мультиплеер</div>
+  </aside>
+
+  <!-- ============================== MAIN ============================= -->
+  <div class="main">
+    <header class="topbar">
+      <div class="tb-title">Нейро-чат</div>
+      <span class="badge" id="userBadge">—</span>
+      <span class="badge online-b" id="onlineBadge">👥 0</span>
+      <div class="tb-spacer"></div>
+      <button class="tb-btn" id="profileBtn">👤 Профиль</button>
+      <button class="tb-btn hidden" id="adminBtn">⚙ Админка</button>
+      <button class="tb-btn danger" id="clearBtn">Очистить</button>
+      <button class="tb-btn danger" id="logoutBtn">Выйти</button>
+    </header>
+
+    <div class="feed" id="feed">
+      <div class="inner" id="inner">
+        <div class="msg-row ai typing-row" id="typingRow">
+          <div class="avatar ai-a">✦</div>
+          <div class="bubble-wrap"><div class="dots"><span></span><span></span><span></span></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="composer">
+      <div class="composer-inner" id="composerBox">
+        <textarea id="input" rows="1" maxlength="2000" placeholder="Спросите что угодно… «реши x^2-5x+6=0», «график sin(x)», «3D тор», «таблица бюджет»"></textarea>
+        <button class="send-btn" id="sendBtn" title="Отправить">➤</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========================= МОДАЛКА ПРОФИЛЯ ======================== -->
+<div class="overlay" id="profileOverlay">
+  <div class="modal">
+    <h3>Профиль — <span id="pfName"></span></h3>
+    <div class="sub">Статус (до 100 символов) · Био (до 500) · Аватар: URL или data-URL (до 2000)</div>
+    <label for="pfStatus">Статус</label>
+    <input type="text" id="pfStatus" maxlength="100" placeholder="Например: изучаю матанализ" />
+    <label for="pfBio">Био</label>
+    <textarea id="pfBio" maxlength="500" placeholder="Пара слов о себе…"></textarea>
+    <label for="pfAvatar">Аватар (URL картинки или data-URL)</label>
+    <input type="text" id="pfAvatar" maxlength="2000" placeholder="https://… или data:image/png;base64,…" />
+    <div class="merr" id="pfErr"></div>
+    <div class="modal-actions">
+      <button class="tb-btn" id="pfCancel">Отмена</button>
+      <button class="send-btn" style="width:auto;padding:8px 16px;border-radius:10px;font-size:13px;font-weight:700;" id="pfSave">Сохранить ➤</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Socket.IO клиент, отдаётся сервером -->
+<script src="/socket.io/socket.io.js"></script>
+
+<script>
+/* ============================================================================
+ * NebulaMind — клиент чата (классический скрипт): авторизация, мультиплеер,
+ * лента сообщений, модалка профиля, эффекты мыши, анимированный логотип.
+ * Математический бот и Three.js — в ES-модуле ниже (window.NM_BOT).
+ * ==========================================================================*/
+(function () {
+  'use strict';
+
+  var ME = { loggedIn: false, username: null, isAdmin: false };
+
+  /* ------------------------------ Утилиты ------------------------------ */
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function fmtTime(iso) {
+    try {
+      var d = new Date(iso);
+      return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    } catch (e) { return ''; }
+  }
+
+  function toast(text) {
+    var t = document.getElementById('toast');
+    t.textContent = text;
+    t.classList.add('on');
+    clearTimeout(t._tm);
+    t._tm = setTimeout(function () { t.classList.remove('on'); }, 3600);
+  }
+
+  async function apiFetch(url, opts) {
+    try {
+      var res = await fetch(url, Object.assign({ credentials: 'same-origin' }, opts || {}));
+      var data = await res.json().catch(function () { return {}; });
+      if (!res.ok) throw new Error(data.error || ('Ошибка ' + res.status));
+      return data;
+    } catch (e) {
+      toast('⚠ ' + (e.message || 'Сетевая ошибка'));
+      throw e;
+    }
+  }
+
+  /* ------------------------- Кэш профилей ------------------------------ */
+  var profileCache = {}; // username -> {bio, avatar, status}
+
+  function loadProfile(username) {
+    return apiFetch('/api/profile/' + encodeURIComponent(username))
+      .then(function (p) { profileCache[username] = p; return p; })
+      .catch(function () { return null; });
+  }
+
+  /* ----------------------------- Лента --------------------------------- */
+  var innerEl = document.getElementById('inner');
+  var feedEl = document.getElementById('feed');
+  var typingRow = document.getElementById('typingRow');
+  var seenIds = {};
+  var rowById = {};
+
+  function scrollBottom() { feedEl.scrollTop = feedEl.scrollHeight; }
+
+  function makeAvatar(kind, username) {
+    var av = document.createElement('div');
+    var p = profileCache[username] || {};
+    if (kind === 'user') {
+      av.className = 'avatar user-a';
+      if (p.avatar && /^(https?:|data:image\/)/i.test(p.avatar)) {
+        var im = document.createElement('img');
+        im.src = p.avatar; im.alt = '';
+        im.onerror = function () { im.remove(); av.textContent = ((username || '?')[0] || '?').toUpperCase(); };
+        av.appendChild(im);
+      } else {
+        av.textContent = ((username || '?')[0] || '?').toUpperCase();
+      }
+    } else if (kind === 'ai') {
+      av.className = 'avatar ai-a';
+      av.textContent = '✦';
+    } else {
+      av.className = 'avatar other-a';
+      av.textContent = ((username || '?')[0] || '?').toUpperCase();
+    }
+    return av;
+  }
+
+  // kind: 'user' | 'ai' | 'other'. nodesOrHtml — DOM-нода, массив нод или HTML-строка.
+  function addBubble(kind, username, nodesOrHtml, timeIso) {
+    var row = document.createElement('div');
+    row.className = 'msg-row ' + kind;
+    var av = makeAvatar(kind, username);
+    var wrap = document.createElement('div');
+    wrap.className = 'bubble-wrap';
+    var bub = document.createElement('div');
+    bub.className = 'bubble';
+
+    if (kind === 'other') {
+      var sender = document.createElement('div');
+      sender.className = 'sender';
+      sender.textContent = username;
+      bub.appendChild(sender);
+    }
+
+    if (typeof nodesOrHtml === 'string') {
+      var body = document.createElement('div');
+      body.innerHTML = nodesOrHtml;
+      bub.appendChild(body);
+    } else {
+      (Array.isArray(nodesOrHtml) ? nodesOrHtml : [nodesOrHtml]).forEach(function (n) {
+        if (n) bub.appendChild(n);
+      });
+    }
+
+    var meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.textContent = fmtTime(timeIso || new Date().toISOString());
+    bub.appendChild(meta);
+
+    wrap.appendChild(bub);
+    if (kind === 'user') { row.appendChild(wrap); row.appendChild(av); }
+    else { row.appendChild(av); row.appendChild(wrap); }
+
+    innerEl.insertBefore(row, typingRow);
+    scrollBottom();
+    return row;
+  }
+
+  function showTyping(on) {
+    typingRow.classList.toggle('on', !!on);
+    if (on) scrollBottom();
+  }
+
+  // Ответ AI: индикатор печати, затем бабл.
+  function aiAnswer(nodeOrNodes, delayMs) {
+    showTyping(true);
+    setTimeout(function () {
+      showTyping(false);
+      addBubble('ai', 'NebulaMind', nodeOrNodes, new Date().toISOString());
+    }, delayMs || 500 + Math.random() * 600);
+  }
+
+  function el(tag, cls, html) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (html !== undefined) n.innerHTML = html;
+    return n;
+  }
+
+  /* --------------------------- Мультиплеер ----------------------------- */
+  var socket = null;
+
+  function renderRemote(msg) {
+    if (!msg || seenIds[msg.id]) return;
+    seenIds[msg.id] = true;
+    var kind = msg.user === ME.username ? 'user' : 'other';
+    var safeText = escapeHtml(msg.text).replace(/\n/g, '<br/>');
+    var row = addBubble(kind, msg.user, el('div', '', safeText), msg.time);
+    if (typeof msg.id === 'number') rowById[msg.id] = row;
+    if (kind === 'other' && !profileCache[msg.user]) loadProfile(msg.user);
+  }
+
+  function connectSocket() {
+    socket = io();
+    socket.on('connect', function () { socket.emit('join', ME.username); });
+    socket.on('history', function (list) { (list || []).forEach(renderRemote); });
+    socket.on('message', renderRemote);
+    socket.on('message_deleted', function (data) {
+      var row = data && rowById[data.id];
+      if (row && row.parentNode) row.parentNode.removeChild(row);
+    });
+    socket.on('online', function (names) {
+      names = names || [];
+      document.getElementById('onlineBadge').textContent =
+        '👥 ' + names.length + (names.length ? ' · ' + names.join(', ').slice(0, 40) : '');
+    });
+    socket.on('profile_updated', function (d) {
+      if (d && d.username) { delete profileCache[d.username]; loadProfile(d.username); }
+    });
+  }
+
+  /* ------------------------------ Отправка ----------------------------- */
+  var inputEl = document.getElementById('input');
+  var composerBox = document.getElementById('composerBox');
+
+  function autoResize() {
+    inputEl.style.height = 'auto';
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + 'px';
+  }
+  inputEl.addEventListener('input', autoResize);
+  inputEl.addEventListener('focus', function () { composerBox.classList.add('focused'); });
+  inputEl.addEventListener('blur', function () { composerBox.classList.remove('focused'); });
+  inputEl.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendCurrent(); }
+  });
+
+  function sendCurrent() {
+    var raw = inputEl.value.trim();
+    if (!raw) return;
+    if (raw.length > 2000) raw = raw.slice(0, 2000);
+    inputEl.value = '';
+    autoResize();
+
+    // 1) Пробуем обработать как команду математического бота (клиентская логика).
+    try {
+      if (window.NM_BOT && window.NM_BOT.handle(raw, aiAnswer)) return;
+    } catch (e) {
+      console.error('NM_BOT error:', e);
+      aiAnswer(el('div', '', '<span style="color:#ff7b9c">Внутренняя ошибка бота: ' + escapeHtml(e.message || e) + '</span>'), 200);
+      return;
+    }
+
+    // 2) Иначе — обычное сообщение в мультиплеер через Socket.IO.
+    renderRemote({ id: 'local-' + Date.now(), user: ME.username, text: raw, time: new Date().toISOString() });
+    if (socket && socket.connected) {
+      socket.emit('message', { text: raw });
+    } else {
+      toast('⚠ Нет соединения с сервером — сообщение не отправлено');
+    }
+  }
+
+  document.getElementById('sendBtn').addEventListener('click', sendCurrent);
+
+  // Быстрые команды из сайдбара
+  document.querySelectorAll('.qbtn').forEach(function (b) {
+    b.addEventListener('click', function () {
+      inputEl.value = b.getAttribute('data-cmd');
+      inputEl.focus();
+      autoResize();
+    });
+  });
+
+  /* ------------------------------ Топбар ------------------------------- */
+  document.getElementById('clearBtn').addEventListener('click', function () {
+    // Очищаем только визуальную ленту (серверная история сохраняется).
+    innerEl.querySelectorAll('.msg-row').forEach(function (r) { r.remove(); });
+    rowById = {}; seenIds = {};
+    innerEl.appendChild(typingRow);
+    toast('Лента очищена локально (история на сервере сохранена)');
+  });
+
+  document.getElementById('logoutBtn').addEventListener('click', async function () {
+    try {
+      await apiFetch('/api/logout', { method: 'POST' });
+      window.location.href = '/login.html';
+    } catch (e) { /* toast уже показан в apiFetch */ }
+  });
+
+  document.getElementById('adminBtn').addEventListener('click', function () {
+    window.location.href = '/admin';
+  });
+
+  /* --------------------------- Модалка профиля ------------------------- */
+  var overlay = document.getElementById('profileOverlay');
+
+  document.getElementById('profileBtn').addEventListener('click', async function () {
+    document.getElementById('pfErr').textContent = '';
+    var p = await loadProfile(ME.username);
+    p = p || { bio: '', avatar: '', status: '' };
+    document.getElementById('pfName').textContent = ME.username;
+    document.getElementById('pfStatus').value = p.status || '';
+    document.getElementById('pfBio').value = p.bio || '';
+    document.getElementById('pfAvatar').value = p.avatar || '';
+    overlay.classList.add('on');
+  });
+
+  document.getElementById('pfCancel').addEventListener('click', function () { overlay.classList.remove('on'); });
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.classList.remove('on'); });
+
+  document.getElementById('pfSave').addEventListener('click', async function () {
+    var status = document.getElementById('pfStatus').value.slice(0, 100);
+    var bio = document.getElementById('pfBio').value.slice(0, 500);
+    var avatar = document.getElementById('pfAvatar').value.slice(0, 2000);
+    var errEl = document.getElementById('pfErr');
+    errEl.textContent = '';
+    if (avatar && !/^(https?:\/\/|data:image\/)/i.test(avatar)) {
+      errEl.textContent = 'Аватар должен быть URL (http…) или data:image/…';
+      return;
+    }
+    try {
+      var d = await apiFetch('/api/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: status, bio: bio, avatar: avatar }),
+      });
+      profileCache[ME.username] = d.profile;
+      overlay.classList.remove('on');
+      toast('✔ Профиль сохранён');
+    } catch (e) {
+      errEl.textContent = e.message || 'Не удалось сохранить';
+    }
+  });
+
+  /* ---------------------- Эффекты мыши (частицы) ----------------------- */
+  // Один canvas на весь экран (pointer-events:none), пул 80 частиц без создания
+  // объектов в цикле, спавн при движении >6px, свечение под курсором (radial 80px),
+  // DPR ≤ 2, FPS-лимит 60.
+  (function mouseFx() {
+    var cv = document.getElementById('fxCanvas');
+    var ctx = cv.getContext('2d');
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var W = 0, H = 0;
+
+    function resize() {
+      W = window.innerWidth; H = window.innerHeight;
+      cv.width = W * dpr; cv.height = H * dpr;
+      cv.style.width = W + 'px'; cv.style.height = H + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    var POOL = 80;
+    var px = new Float32Array(POOL), py = new Float32Array(POOL),
+        vx = new Float32Array(POOL), vy = new Float32Array(POOL),
+        pl = new Float32Array(POOL), pc = new Uint8Array(POOL);
+    var head = 0;
+
+    var mx = -999, my = -999, lastX = -999, lastY = -999;
+    window.addEventListener('pointermove', function (e) {
+      mx = e.clientX; my = e.clientY;
+      var dx = mx - lastX, dy = my - lastY;
+      if (dx * dx + dy * dy > 36) { // порождение при смещении > 6px
+        lastX = mx; lastY = my;
+        for (var k = 0; k < 2; k++) {
+          var i = head; head = (head + 1) % POOL;
+          px[i] = mx; py[i] = my;
+          var a = Math.random() * Math.PI * 2, sp = 0.4 + Math.random() * 1.6;
+          vx[i] = Math.cos(a) * sp; vy[i] = Math.sin(a) * sp - 0.4;
+          pl[i] = 1; pc[i] = Math.floor(Math.random() * 3);
+        }
+      }
+    });
+
+    var COLORS = ['rgba(77,124,255,', 'rgba(160,107,255,', 'rgba(34,211,238,'];
+    var lastFrame = 0, FRAME_MS = 1000 / 60;
+
+    function loop(ts) {
+      requestAnimationFrame(loop);
+      if (ts - lastFrame < FRAME_MS) return; // FPS-лимит 60
+      lastFrame = ts;
+      ctx.clearRect(0, 0, W, H);
+
+      if (mx > -500) { // свечение под курсором
+        var g = ctx.createRadialGradient(mx, my, 0, mx, my, 80);
+        g.addColorStop(0, 'rgba(120,140,255,0.10)');
+        g.addColorStop(1, 'rgba(120,140,255,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(mx - 80, my - 80, 160, 160);
+      }
+
+      for (var i = 0; i < POOL; i++) {
+        if (pl[i] <= 0) continue;
+        px[i] += vx[i]; py[i] += vy[i]; vy[i] += 0.015;
+        pl[i] -= 0.02;
+        var al = pl[i];
+        ctx.fillStyle = COLORS[pc[i]] + al.toFixed(3) + ')';
+        ctx.beginPath();
+        ctx.arc(px[i], py[i], 1.6 + al * 2.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    requestAnimationFrame(loop);
+  })();
+
+  /* ---------------------- Логотип-нейросеть (canvas) ------------------- */
+  (function logoFx() {
+    var cv = document.getElementById('logoCanvas');
+    if (!cv) return;
+    var ctx = cv.getContext('2d');
+    var nodes = [];
+    for (var i = 0; i < 9; i++) {
+      nodes.push({ a: Math.random() * Math.PI * 2, r: 12 + Math.random() * 22, s: 0.004 + Math.random() * 0.012, sz: 1.5 + Math.random() * 2 });
+    }
+    function tick() {
+      requestAnimationFrame(tick);
+      ctx.clearRect(0, 0, 80, 80);
+      var cx = 40, cy = 40;
+      var pts = nodes.map(function (n) {
+        n.a += n.s;
+        return { x: cx + Math.cos(n.a) * n.r, y: cy + Math.sin(n.a * 1.3) * n.r, sz: n.sz };
+      });
+      ctx.lineWidth = 1;
+      for (var i2 = 0; i2 < pts.length; i2++) {
+        ctx.strokeStyle = 'rgba(120,140,255,0.35)';
+        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(pts[i2].x, pts[i2].y); ctx.stroke();
+        for (var j = i2 + 1; j < pts.length; j++) {
+          var dx = pts[i2].x - pts[j].x, dy = pts[i2].y - pts[j].y;
+          if (dx * dx + dy * dy < 900) {
+            ctx.strokeStyle = 'rgba(160,107,255,0.22)';
+            ctx.beginPath(); ctx.moveTo(pts[i2].x, pts[i2].y); ctx.lineTo(pts[j].x, pts[j].y); ctx.stroke();
+          }
+        }
+      }
+      var core = ctx.createRadialGradient(cx, cy, 0, cx, cy, 10);
+      core.addColorStop(0, '#c39bff'); core.addColorStop(1, 'rgba(77,124,255,0.05)');
+      ctx.fillStyle = core;
+      ctx.beginPath(); ctx.arc(cx, cy, 8, 0, Math.PI * 2); ctx.fill();
+      pts.forEach(function (p) {
+        ctx.fillStyle = '#22d3ee';
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.sz, 0, Math.PI * 2); ctx.fill();
+      });
+    }
+    tick();
+  })();
+
+  // Публиуем примитивы для модуля бота.
+  window.NM = {
+    get ME() { return ME; },
+    escapeHtml: escapeHtml,
+    toast: toast,
+    apiFetch: apiFetch,
+  };
+
+  /* ------------------------------ Старт --------------------------------- */
+  apiFetch('/api/me')
+    .then(function (me) {
+      if (!me.loggedIn) { window.location.href = '/login.html'; return Promise.reject(new Error('out')); }
+      ME.loggedIn = true; ME.username = me.username; ME.isAdmin = !!me.isAdmin;
+      document.getElementById('userBadge').textContent = '👤 ' + me.username + (me.isAdmin ? ' · admin' : '');
+      if (me.isAdmin) document.getElementById('adminBtn').classList.remove('hidden');
+      return loadProfile(me.username);
+    })
+    .then(function () {
+      connectSocket();
+      addBubble('ai', 'NebulaMind',
+        el('div', '',
+          'Привет, <b>' + escapeHtml(ME.username || '') + '</b>! Я <b>NebulaMind</b> 🧠<br/>' +
+          'Команды: <span class="res">реши 5(x-3)=2x+6</span> · <span class="res">реши x^2-5x+6=0</span> · ' +
+          '<span class="res">график sin(x) от -5 до 5</span> · <span class="res">производная x^2</span> · ' +
+          '<span class="res">интеграл x^2 от 0 до 3</span> · <span class="res">sin(x) при x=1</span> · ' +
+          '<span class="res">таблица бюджет</span> · <span class="res">3D тор</span> · ' +
+          '<span class="res">поиск …</span> · справочник формул.<br/>' +
+          'Обычные сообщения уходят всем онлайн через Socket.IO.'),
+        new Date().toISOString());
+    })
+    .catch(function () {});
+})();
+</script>
+
+<script type="module">
+/* ============================================================================
+ * Модульный скрипт NebulaMind: Three.js (через importmap) + математический
+ * движок чат-бота. Регистрирует window.NM_BOT.
+ * Функции: линейные/квадратные уравнения, графики, производная, интеграл,
+ * значение функции, справочник формул, таблицы+CSV, 3D-генератор, веб-поиск.
+ * ==========================================================================*/
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const esc = (s) => String(s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+function elDiv(html) { const d = document.createElement('div'); d.innerHTML = html; return d; }
+
+/* ====================== Парсер выражений (рекурсивный спуск) ============== */
+// Поддерживает: + - * / ^, скобки, неявное умножение (2x, 5(x-3)),
+// функции sin cos tan sqrt abs log ln exp asin acos atan floor ceil,
+// константы pi, e, переменную x.
+function compileExpr(src) {
+  const s = String(src)
+    .replace(/,/g, '.')
+    .replace(/\s+/g, '')
+    .replace(/π/gi, 'pi')
+    .replace(/√/g, 'sqrt')
+    .replace(/\bln\b/g, 'log')
+    .replace(/\be\b/g, 'E');
+  let pos = 0;
+  const peek = () => s[pos];
+  const EOF = () => pos >= s.length;
+
+  function expect(ch) {
+    if (peek() !== ch) throw new Error('ожидался «' + ch + '»');
+    pos++;
+  }
+
+  function parseAtom() {
+    if (peek() === '(') { pos++; const v = parseAdd(); expect(')'); return v; }
+    if (peek() === '-') { pos++; const v = parseAtom(); return (x) => -v(x); }
+    if (peek() === '+') { pos++; return parseAtom(); }
+    const m = /^(\d+\.?\d*|\.\d+|[A-Za-z]+)/.exec(s.slice(pos));
+    if (!m) throw new Error('не удалось разобрать около «' + s.slice(pos, pos + 8) + '»');
+    pos += m[0].length;
+    const tok = m[0];
+    if (/^[.0-9]/.test(tok)) { const c = parseFloat(tok); return () => c; }
+    if (tok === 'x' || tok === 'X') return (x) => x;
+    if (tok === 'pi' || tok === 'PI') return () => Math.PI;
+    if (tok === 'E') return () => Math.E;
+    const fns = {
+      sin: Math.sin, cos: Math.cos, tan: Math.tan, sqrt: Math.sqrt,
+      abs: Math.abs, log: Math.log, log10: Math.log10, exp: Math.exp,
+      asin: Math.asin, acos: Math.acos, atan: Math.atan,
+      floor: Math.floor, ceil: Math.ceil, sign: Math.sign,
+    };
+    if (fns[tok]) {
+      if (peek() !== '(') throw new Error('после «' + tok + '» нужны скобки');
+      pos++;
+      const arg = parseAdd();
+      expect(')');
+      const f = fns[tok];
+      return (x) => f(arg(x));
+    }
+    throw new Error('неизвестный символ «' + tok + '»');
+  }
+
+  // атом + неявное умножение: 2x, 3(x+1), x sin(x)
+  function parseImplicitMul() {
+    let left = parseAtom();
+    while (!EOF() && (peek() === '(' || /[A-Za-z0-9.]/.test(peek()))) {
+      const save = pos;
+      let right;
+      try { right = parseAtom(); } catch (e) { pos = save; break; }
+      const l = left;
+      left = (x) => l(x) * right(x);
+    }
+    return left;
+  }
+
+  function parsePow() {
+    const base = parseImplicitMul();
+    if (peek() === '^') {
+      pos++;
+      const ex = parsePow();
+      return (x) => Math.pow(base(x), ex(x));
+    }
+    return base;
+  }
+
+  function parseMul() {
+    let left = parsePow();
+    while (!EOF() && (peek() === '*' || peek() === '/')) {
+      const op = s[pos++];
+      const right = parsePow();
+      const l = left;
+      left = op === '*' ? (x) => l(x) * right(x) : (x) => l(x) / right(x);
+    }
+    return left;
+  }
+
+  function parseAdd() {
+    let left = parseMul();
+    while (!EOF() && (peek() === '+' || peek() === '-')) {
+      const op = s[pos++];
+      const right = parseMul();
+      const l = left;
+      left = op === '+' ? (x) => l(x) + right(x) : (x) => l(x) - right(x);
+    }
+    return left;
+  }
+
+  const fn = parseAdd();
+  if (!EOF()) throw new Error('лишнее: «' + s.slice(pos) + '»');
+  fn(0); fn(1); // проверка работоспособности
+  return fn;
+}
+
+function fmtNum(v, digits = 4) {
+  if (typeof v !== 'number' || !isFinite(v)) return String(v);
+  const r = Math.round(v * Math.pow(10, digits)) / Math.pow(10, digits);
+  return Object.is(r, -0) ? '0' : String(r);
+}
+
+/* ==================== Линейные уравнения со скобками (шаги) ================ */
+// Любая левая/правая часть линейна: f(x) = A·x + B (коэффициенты — из 2 точек).
+function linearCoefs(fn) {
+  const f0 = fn(0), f1 = fn(1);
+  return { A: f1 - f0, B: f0 };
+}
+
+function solveLinear(eqStr) {
+  const parts = eqStr.split('=');
+  if (parts.length !== 2) return { error: 'Нужен знак «=», например 5(x-3)=2x+6' };
+  let L, R;
+  try { L = compileExpr(parts[0]); R = compileExpr(parts[1]); }
+  catch (e) { return { error: 'Не удалось разобрать: ' + (e.message || e) }; }
+  const l = linearCoefs(L), r = linearCoefs(R);
+  const steps = [];
+  steps.push('1) Раскрываем скобки и приводим подобные:');
+  steps.push('     левая часть  → ' + fmtNum(l.A) + '·x + ' + fmtNum(l.B));
+  steps.push('     правая часть → ' + fmtNum(r.A) + '·x + ' + fmtNum(r.B));
+  const A = l.A - r.A, B = r.B - l.B;
+  steps.push('2) Переносим x влево, числа вправо:');
+  steps.push('     (' + fmtNum(l.A) + ' − ' + fmtNum(r.A) + ')·x = ' + fmtNum(r.B) + ' − (' + fmtNum(l.B) + ')');
+  steps.push('     ' + fmtNum(A) + '·x = ' + fmtNum(B));
+  if (Math.abs(A) < 1e-12) {
+    steps.push('3) Делить на 0 нельзя → ' + (Math.abs(B) < 1e-12 ? '0·x = 0, решений бесконечно много' : '0·x = ' + fmtNum(B) + ', решений нет'));
+    return { steps, solution: null };
+  }
+  const x = B / A;
+  steps.push('3) Делим обе части на ' + fmtNum(A) + ':  x = ' + fmtNum(B) + ' / ' + fmtNum(A) + ' = ' + fmtNum(x));
+  const cl = L(x), cr = R(x);
+  steps.push('4) Проверка: ЛВО = ' + fmtNum(cl) + ', ПВО = ' + fmtNum(cr) +
+    (Math.abs(cl - cr) < 1e-9 ? ' ✓ верно' : ' ✗ странно, проверьте ввод'));
+  return { steps, solution: x };
+}
+
+/* ================= Квадратные уравнения с дискриминантом =================== */
+// f(x) = A·x² + B·x + C — коэффициенты из 3 точек (-1, 0, 1).
+function quadCoefs(fn) {
+  const fm1 = fn(-1), f0 = fn(0), fp1 = fn(1);
+  return { A: (fm1 + fp1) / 2 - f0, B: (fp1 - fm1) / 2, C: f0 };
+}
+
+function solveQuadratic(eqStr) {
+  const parts = eqStr.split('=');
+  if (parts.length !== 2) return { error: 'Нужен знак «=», например x^2-5x+6=0' };
+  let F;
+  try {
+    const L = compileExpr(parts[0]), R = compileExpr(parts[1]);
+    F = (x) => L(x) - R(x);
+  } catch (e) { return { error: 'Не удалось разобрать: ' + (e.message || e) }; }
+  const { A, B, C } = quadCoefs(F);
+  if (Math.abs(A) < 1e-12) return solveLinear(eqStr); // вырождается в линейное
+  const steps = [];
+  steps.push('1) Переносим всё влево, вид ax² + bx + c = 0:');
+  steps.push('     a = ' + fmtNum(A) + ',  b = ' + fmtNum(B) + ',  c = ' + fmtNum(C));
+  const D = B * B - 4 * A * C;
+  steps.push('2) Дискриминант: D = b² − 4ac = ' + fmtNum(B * B) + ' − ' + fmtNum(4 * A * C) + ' = ' + fmtNum(D));
+  let roots = [];
+  if (D > 1e-12) {
+    const sq = Math.sqrt(D);
+    const x1 = (-B - sq) / (2 * A), x2 = (-B + sq) / (2 * A);
+    roots = [x1, x2];
+    steps.push('3) D > 0 → два корня: x = (' + fmtNum(-B) + ' ± √' + fmtNum(D) + ') / (2·' + fmtNum(A) + ')');
+    steps.push('     x₁ = ' + fmtNum(x1) + ',  x₂ = ' + fmtNum(x2));
+  } else if (Math.abs(D) <= 1e-12) {
+    const x1 = -B / (2 * A);
+    roots = [x1];
+    steps.push('3) D = 0 → один корень: x = −b/(2a) = ' + fmtNum(x1));
+  } else {
+    steps.push('3) D < 0 → действительных корней нет');
+    const re = -B / (2 * A), im = Math.abs(Math.sqrt(-D) / (2 * A));
+    steps.push('     комплексные: x = ' + fmtNum(re) + ' ± ' + fmtNum(im) + '·i');
+  }
+  if (roots.length) {
+    steps.push('4) Проверка (подстановка): ' +
+      roots.map((x) => 'f(' + fmtNum(x) + ') = ' + fmtNum(F(x))).join(';  ') + ' ✓');
+  }
+  return { steps, roots, D };
+}
+
+function renderSteps(res, title) {
+  if (res.error) return elDiv('<span style="color:#ff7b9c">' + esc(res.error) + '</span>');
+  const stepsHtml = res.steps.map((s) => '<div class="step">' + esc(s) + '</div>').join('');
+  let tail = '';
+  if (res.solution !== undefined && res.solution !== null) {
+    tail = '<div class="res" style="font-size:16px;margin-top:6px">Ответ: x = ' + fmtNum(res.solution) + '</div>';
+  } else if (res.roots && res.roots.length) {
+    tail = '<div class="res" style="font-size:16px;margin-top:6px">Ответ: ' +
+      res.roots.map((r, i) => 'x' + (res.roots.length > 1 ? (i ? '₂' : '₁') : '') + ' = ' + fmtNum(r)).join(';  ') + '</div>';
+  }
+  return elDiv('<div><b>' + esc(title) + '</b><pre class="codeblk">' + stepsHtml.replace(/<\/?div>/g, '').trim() + '</pre>' + tail + '</div>');
+}
+
+/* ======================= Графики функций на canvas ========================= */
+function niceTicks(min, max, count) {
+  const span = max - min;
+  if (!(span > 0)) return [min];
+  const step0 = span / count;
+  const mag = Math.pow(10, Math.floor(Math.log10(step0)));
+  const norm = step0 / mag;
+  const step = (norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10) * mag;
+  const out = [];
+  for (let t = Math.ceil(min / step) * step; t <= max + 1e-9; t += step) out.push(Math.round(t / step) * step);
+  return out;
+}
+
+function makeGraph(exprSrc, from, to) {
+  let fn;
+  try { fn = compileExpr(exprSrc); }
+  catch (e) { return elDiv('<span style="color:#ff7b9c">Не удалось разобрать функцию: ' + esc(e.message || e) + '</span>'); }
+
+  const cv = document.createElement('canvas');
+  cv.width = 420; cv.height = 260;
+  cv.className = 'gcanvas';
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = '#070a14'; ctx.fillRect(0, 0, 420, 260);
+
+  const N = 300, ys = [];
+  for (let i = 0; i <= N; i++) {
+    const y = fn(from + (to - from) * i / N);
+    if (isFinite(y)) ys.push(y);
+  }
+  if (!ys.length) return elDiv('<span style="color:#ff7b9c">Функция не определена на этом интервале</span>');
+  let yMin = Math.min.apply(null, ys), yMax = Math.max.apply(null, ys);
+  if (yMax - yMin < 1e-9) { yMin -= 1; yMax += 1; }
+  const pad = (yMax - yMin) * 0.12; yMin -= pad; yMax += pad;
+
+  const PX = 420, PY = 260, ML = 36, MB = 22, MT = 10, MR = 8;
+  const X = (x) => ML + (x - from) / (to - from) * (PX - ML - MR);
+  const Y = (y) => MT + (yMax - y) / (yMax - yMin) * (PY - MT - MB);
+
+  // Сетка + подписи
+  ctx.font = '10px Segoe UI, sans-serif';
+  ctx.lineWidth = 1;
+  niceTicks(from, to, 7).forEach((t) => {
+    ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+    ctx.beginPath(); ctx.moveTo(X(t), MT); ctx.lineTo(X(t), PY - MB); ctx.stroke();
+    ctx.fillStyle = '#5f6f95';
+    ctx.fillText(fmtNum(t, 2), X(t) - 8, PY - MB + 13);
+  });
+  niceTicks(yMin, yMax, 6).forEach((t) => {
+    ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+    ctx.beginPath(); ctx.moveTo(ML, Y(t)); ctx.lineTo(PX - MR, Y(t)); ctx.stroke();
+    ctx.fillStyle = '#5f6f95';
+    ctx.fillText(fmtNum(t, 2), 2, Y(t) + 3);
+  });
+
+  // Оси
+  ctx.strokeStyle = 'rgba(160,170,220,0.6)'; ctx.lineWidth = 1.4;
+  if (0 >= from && 0 <= to) { ctx.beginPath(); ctx.moveTo(X(0), MT); ctx.lineTo(X(0), PY - MB); ctx.stroke(); }
+  if (0 >= yMin && 0 <= yMax) { ctx.beginPath(); ctx.moveTo(ML, Y(0)); ctx.lineTo(PX - MR, Y(0)); ctx.stroke(); }
+
+  // Кривая
+  ctx.strokeStyle = '#22d3ee'; ctx.lineWidth = 2; ctx.beginPath();
+  let started = false;
+  for (let i = 0; i <= N; i++) {
+    const x = from + (to - from) * i / N, y = fn(x);
+    if (!isFinite(y)) { started = false; continue; }
+    const py = Math.max(MT - 60, Math.min(PY - MB + 60, Y(y)));
+    if (!started) { ctx.moveTo(X(x), py); started = true; } else ctx.lineTo(X(x), py);
+  }
+  ctx.stroke();
+
+  // Значения в точках −2, −1, 0, 1, 2
+  const dots = [];
+  [-2, -1, 0, 1, 2].forEach((x) => {
+    if (x < from || x > to) return;
+    const y = fn(x);
+    if (!isFinite(y)) return;
+    const cx = X(x), cy = Math.max(MT, Math.min(PY - MB, Y(y)));
+    ctx.fillStyle = '#a06bff';
+    ctx.beginPath(); ctx.arc(cx, cy, 3.4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#c3d0ef'; ctx.font = '9.5px Segoe UI, sans-serif';
+    ctx.fillText('(' + x + '; ' + fmtNum(y, 2) + ')', Math.min(cx + 5, PX - 52), Math.max(cy - 6, MT + 8));
+    dots.push('f(' + x + ') = ' + fmtNum(y));
+  });
+
+  const wrap = elDiv('');
+  wrap.appendChild(cv);
+  wrap.appendChild(elDiv('<div style="font-size:12px;color:#9feaf9;margin-top:4px">y = ' +
+    esc(exprSrc) + ', x ∈ [' + fmtNum(from) + '; ' + fmtNum(to) + '] · ' + esc(dots.join(' · ')) + '</div>'));
+  return wrap;
+}
+
+/* ============ Производная / интеграл / значение функции (численно) ======== */
+function derivativeCalc(exprSrc) {
+  let fn;
+  try { fn = compileExpr(exprSrc); }
+  catch (e) { return elDiv('<span style="color:#ff7b9c">Ошибка: ' + esc(e.message || e) + '</span>'); }
+  const h = 1e-5;
+  const dfn = (x) => (fn(x + h) - fn(x - h)) / (2 * h);
+  const rows = [-2, -1, 0, 1, 2].map((x) =>
+    '<tr><td>' + x + '</td><td>' + fmtNum(fn(x), 5) + '</td><td>' + fmtNum(dfn(x), 5) + '</td></tr>').join('');
+  return elDiv(
+    '<div>Численная производная (центральная разность, h = 10⁻⁵):</div>' +
+    '<pre class="codeblk">f(x) = ' + esc(exprSrc) + '\nf′(x) ≈ [f(x+h) − f(x−h)] / 2h</pre>' +
+    '<table class="dt"><tr><th>x</th><th>f(x)</th><th>f′(x)</th></tr>' + rows + '</table>');
+}
+
+function integralCalc(exprSrc, a, b) {
+  let fn;
+  try { fn = compileExpr(exprSrc); }
+  catch (e) { return elDiv('<span style="color:#ff7b9c">Ошибка: ' + esc(e.message || e) + '</span>'); }
+  const n = 500, hStep = (b - a) / n;
+  let sum = 0, bad = false;
+  for (let i = 0; i <= n; i++) {
+    const y = fn(a + i * hStep);
+    if (!isFinite(y)) { bad = true; break; }
+    sum += (i === 0 || i === n) ? y / 2 : y;
+  }
+  if (bad) return elDiv('<span style="color:#ff7b9c">Функция не определена на всём интервале интегрирования</span>');
+  const val = sum * hStep;
+  return elDiv(
+    '<div>Численный интеграл методом трапеций (n = 500 шагов):</div>' +
+    '<pre class="codeblk">∫[' + fmtNum(a) + ', ' + fmtNum(b) + '] ' + esc(exprSrc) + ' dx ≈ Σ (f(xᵢ)+f(xᵢ₊₁))/2 · h\nh = (' + fmtNum(b) + ' − ' + fmtNum(a) + ') / 500 = ' + fmtNum(hStep, 6) + '</pre>' +
+    '<div class="res" style="font-size:16px">≈ ' + fmtNum(val, 6) + '</div>');
+}
+
+function valueAt(exprSrc, xv) {
+  let fn;
+  try { fn = compileExpr(exprSrc); }
+  catch (e) { return elDiv('<span style="color:#ff7b9c">Ошибка: ' + esc(e.message || e) + '</span>'); }
+  const y = fn(xv);
+  if (!isFinite(y)) return elDiv('<span style="color:#ff7b9c">Функция не определена в точке x = ' + fmtNum(xv) + '</span>');
+  return elDiv(
+    '<pre class="codeblk">f(x) = ' + esc(exprSrc) + '\nx = ' + fmtNum(xv) + '\nf(' + fmtNum(xv) + ') = ' + fmtNum(y, 8) + '</pre>' +
+    '<div class="res" style="font-size:16px">' + esc(exprSrc) + ' = ' + fmtNum(y, 6) + ' при x = ' + fmtNum(xv) + '</div>');
+}
+
+/* ============================ Справочник формул =========================== */
+const FORMULAS = [
+  { k: ['сокращенн', 'умножен', 'квадрат суммы', 'квадрат разности'], a: '(a ± b)² = a² ± 2ab + b²\n(a − b)(a + b) = a² − b²\n(a ± b)³ = a³ ± 3a²b + 3ab² ± b³\na³ ± b³ = (a ± b)(a² ∓ ab + b²)' },
+  { k: ['дискриминант', 'квадратное уравнение'], a: 'ax² + bx + c = 0\nD = b² − 4ac\nD > 0: x = (−b ± √D) / 2a\nD = 0: x = −b / 2a\nD < 0: действительных корней нет' },
+  { k: ['виета', 'теорема виета'], a: 'Для ax² + bx + c = 0:\nx₁ + x₂ = −b/a\nx₁ · x₂ = c/a' },
+  { k: ['площадь круга', 'круг', 'окружность'], a: 'S круга = πr²\nL окружности = 2πr\nS сектора = πr²·φ/360°' },
+  { k: ['треугольник', 'площадь треугольника', 'герон'], a: 'S = ½ · a · h\nS = ½ · a·b·sin C\nПо Герону: S = √(p(p−a)(p−b)(p−c)), p = (a+b+c)/2' },
+  { k: ['пифагор', 'гипотенуза', 'прямоугольный треугольник'], a: 'c² = a² + b²\nгде a, b — катеты, c — гипотенуза' },
+  { k: ['прямоугольник', 'периметр'], a: 'Прямоугольник: S = a·b, P = 2(a + b)\nКвадрат: S = a², P = 4a' },
+  { k: ['объем', 'объём', 'шар', 'цилиндр', 'конус', 'параллелепипед'], a: 'Шар: V = 4/3·πr³\nЦилиндр: V = πr²h\nКонус: V = ⅓·πr²h\nПараллелепипед: V = a·b·c' },
+  { k: ['тригонометрия', 'синус', 'косинес', 'тангенс', 'основное тригонометрическое'], a: 'sin²x + cos²x = 1\ntan x = sin x / cos x\nsin(a±b) = sin a·cos b ± cos a·sin b\ncos(a±b) = cos a·cos b ∓ sin a·sin b' },
+  { k: ['производн', 'таблица производных'], a: '(xⁿ)′ = n·xⁿ⁻¹\n(sin x)′ = cos x\n(cos x)′ = −sin x\n(tan x)′ = 1/cos²x\n(eˣ)′ = eˣ\n(ln x)′ = 1/x\n(u·v)′ = u′v + uv′\n(u/v)′ = (u′v − uv′)/v²' },
+  { k: ['интеграл', 'первообразная'], a: '∫xⁿ dx = xⁿ⁺¹/(n+1) + C\n∫sin x dx = −cos x + C\n∫cos x dx = sin x + C\n∫eˣ dx = eˣ + C\n∫dx/x = ln|x| + C' },
+  { k: ['арифметическая прогрессия'], a: 'aₙ = a₁ + (n−1)d\nSₙ = (a₁ + aₙ)/2 · n' },
+  { k: ['геометрическая прогрессия'], a: 'bₙ = b₁·qⁿ⁻¹\nSₙ = b₁(qⁿ − 1)/(q − 1), q ≠ 1' },
+  { k: ['степень', 'свойства степеней'], a: 'aᵐ·aⁿ = aᵐ⁺ⁿ\naᵐ/aⁿ = aᵐ⁻ⁿ\n(aᵐ)ⁿ = aᵐⁿ\n(ab)ⁿ = aⁿbⁿ\na⁰ = 1, a⁻ⁿ = 1/aⁿ' },
+  { k: ['логарифм'], a: 'log(a·b) = log a + log b\nlog(a/b) = log a − log b\nlog(aⁿ) = n·log a\na^(logₐ x) = x' },
+  { k: ['синус theorem', 'теорема синусов'], a: 'a/sin A = b/sin B = c/sin C = 2R' },
+  { k: ['косинус', 'теорема косинусов'], a: 'c² = a² + b² − 2ab·cos C' },
+];
+
+function lookupFormula(query) {
+  const q = query.toLowerCase();
+  const words = q.split(/\s+/).filter(Boolean);
+  let best = null, bestScore = 0;
+  for (const f of FORMULAS) {
+    let score = 0;
+    for (const w of words) {
+      for (const key of f.k) {
+        if (key.includes(w) || w.includes(key)) { score += w.length; break; }
+      }
+    }
+    if (score > bestScore) { bestScore = score; best = f; }
+  }
+  if (!best || bestScore < 3) return null;
+  return elDiv('<div><b>📚 Справочник</b><pre class="codeblk">' + esc(best.a) + '</pre></div>');
+}
+
+/* ===================== Таблицы + скачивание CSV (Excel) ==================== */
+const TABLES = {
+  budget: {
+    title: 'Месячный бюджет',
+    head: ['Статья', 'Запланировано ₽', 'Факт ₽', 'Разница ₽'],
+    rows: [
+      ['Продукты', 20000, 21450, ''],
+      ['Транспорт', 6000, 5400, ''],
+      ['Жильё', 35000, 35000, ''],
+      ['Развлечения', 8000, 9700, ''],
+      ['Подписки/связь', 2500, 2500, ''],
+      ['Накопления', 15000, 10000, ''],
+    ],
+    totalLabel: 'Итого',
+  },
+  grades: {
+    title: 'Успеваемость',
+    head: ['Предмет', 'Контрольная', 'Дз', 'Средний балл'],
+    rows: [
+      ['Алгебра', 5, 4, ''],
+      ['Геометрия', 4, 5, ''],
+      ['Физика', 5, 5, ''],
+      ['Информатика', 5, 4, ''],
+      ['Химия', 3, 4, ''],
+    ],
+    avgCols: [1, 2],
+  },
+  population: {
+    title: 'Население стран (млн, оценка)',
+    head: ['Страна', 'Население, млн', 'Доля мира, %'],
+    rows: [
+      ['Индия', 1440, ''],
+      ['Китай', 1411, ''],
+      ['США', 341, ''],
+      ['Индонезия', 279, ''],
+      ['Пакистан', 245, ''],
+      ['Россия', 144, ''],
+    ],
+    shareOf: 1, worldTotal: 8100,
+  },
+};
+
+function buildTable(kind) {
+  const t = TABLES[kind];
+  if (!t) return null;
+  const rows = t.rows.map((r) => r.slice());
+  // Средний балл
+  if (t.avgCols) {
+    rows.forEach((r) => {
+      const vals = t.avgCols.map((ci) => Number(r[ci])).filter(isFinite);
+      r[t.head.length - 1] = vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2) : '—';
+    });
+  }
+  // Доля мира
+  if (t.shareOf !== undefined) {
+    rows.forEach((r) => { r[2] = (Number(r[t.shareOf]) / t.worldTotal * 100).toFixed(1); });
+  }
+  // Итого / разница
+  let totalHtml = '';
+  if (t.totalLabel) {
+    const sums = [1, 2].map((ci) => rows.reduce((a, r) => a + Number(r[ci] || 0), 0));
+    rows.forEach((r) => { r[3] = Number(r[2]) - Number(r[1]); });
+    totalHtml = '<tr><td><b>' + esc(t.totalLabel) + '</b></td><td><b>' + sums[0] + '</b></td><td><b>' + sums[1] + '</b></td><td><b>' + (sums[1] - sums[0]) + '</b></td></tr>';
+  }
+  const bodyHtml = rows.map((r) => '<tr>' + r.map((c) => '<td>' + esc(c) + '</td>').join('') + '</tr>').join('');
+  const headHtml = '<tr>' + t.head.map((h) => '<th>' + esc(h) + '</th>').join('') + '</tr>';
+
+  const wrap = elDiv('<div><b>📊 ' + esc(t.title) + '</b><table class="dt">' + headHtml + bodyHtml + totalHtml + '</table></div>');
+
+  const btn = document.createElement('button');
+  btn.className = 'csv-btn';
+  btn.textContent = '⬇ Скачать CSV (Excel)';
+  btn.addEventListener('click', function () {
+    // CSV с BOM и разделителем ';' — корректно открывается в Excel.
+    const lines = [t.head].concat(rows).concat(t.totalLabel ? [[t.totalLabel,
+      String(rows.reduce((a, r) => a + Number(r[1] || 0), 0) || ''),
+      String(rows.reduce((a, r) => a + Number(r[2] || 0), 0) || ''),
+      String(rows.reduce((a, r) => a + Number(r[3] || 0), 0) || '')]] : []);
+    const csv = '\ufeff' + lines.map((ln) => ln.map((c) => '"' + String(c).replace(/"/g, '""') + '"').join(';')).join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = kind + '.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  });
+  wrap.appendChild(btn);
+  return wrap;
+}
+
+/* ============================ 3D-генератор ================================ */
+const SHAPES = {
+  'куб': () => new THREE.BoxGeometry(1.6, 1.6, 1.6),
+  'сфера': () => new THREE.SphereGeometry(1.2, 48, 32),
+  'цилиндр': () => new THREE.CylinderGeometry(1, 1, 2, 48),
+  'конус': () => new THREE.ConeGeometry(1.1, 2.2, 48),
+  'тор': () => new THREE.TorusGeometry(1.1, 0.42, 24, 96),
+};
+
+function make3D(name) {
+  const geoFactory = SHAPES[name];
+  if (!geoFactory) return null;
+
+  const wrap = elDiv('<div><b>🧊 3D-генератор: ' + esc(name) + '</b></div>');
+  const holder = elDiv('<div class="scene3d"></div>');
+  const hint = elDiv('<div class="hint3d">ЛКМ — вращать · колесо — зум · ПКМ — панорама</div>');
+  wrap.appendChild(holder);
+  holder.appendChild(hint);
+
+  const W = 420, H = 300;
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setSize(W, H);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  holder.insertBefore(renderer.domElement, hint);
+
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x070a14, 0.06);
+  const camera = new THREE.PerspectiveCamera(50, W / H, 0.1, 100);
+  camera.position.set(3.2, 2.4, 3.6);
+
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+
+  // Освещение
+  scene.add(new THREE.AmbientLight(0x8899ff, 0.5));
+  const key = new THREE.DirectionalLight(0xffffff, 1.1);
+  key.position.set(4, 6, 3);
+  scene.add(key);
+  const rim = new THREE.PointLight(0xa06bff, 1.4, 20);
+  rim.position.set(-4, 2, -3);
+  scene.add(rim);
+  const cyan = new THREE.PointLight(0x22d3ee, 1.0, 18);
+  cyan.position.set(3, -2, 4);
+  scene.add(cyan);
+
+  // Сетка-пол
+  const grid = new THREE.GridHelper(12, 24, 0x4d7cff, 0x1c2744);
+  grid.position.y = -1.8;
+  scene.add(grid);
+
+  // Фигура: материал-стекло с эмиссией + каркас
+  const geo = geoFactory();
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0x6d8dff, metalness: 0.35, roughness: 0.25,
+    emissive: 0x120a2a, transparent: true, opacity: 0.92,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  scene.add(mesh);
+  const wire = new THREE.LineSegments(
+    new THREE.EdgesGeometry(geo, 24),
+    new THREE.LineBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.35 })
+  );
+  mesh.add(wire);
+
+  let rafId = 0;
+  function animate() {
+    rafId = requestAnimationFrame(animate);
+    mesh.rotation.y += 0.005;
+    mesh.rotation.x += 0.0018;
+    controls.update();
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  // Останавливаем рендер, когда бабл удалён из DOM (экономия GPU).
+  const observer = new MutationObserver(() => {
+    if (!document.body.contains(holder)) {
+      cancelAnimationFrame(rafId);
+      observer.disconnect();
+      controls.dispose();
+      geo.dispose(); mat.dispose();
+      renderer.dispose();
+    }
+  });
+  observer.observe(document.getElementById('inner'), { childList: true, subtree: true });
+
+  return wrap;
+}
+
+/* ======================= Веб-поиск через DuckDuckGo ======================= */
+async function webSearch(query, aiAnswerFn) {
+  const busy = elDiv('<div>🔎 Ищу в вебе: <b>' + esc(query) + '</b>…</div>');
+  try {
+    const res = await fetch('https://html.duckduckgo.com/html/?q=' + encodeURIComponent(query));
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const html = await res.text();
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const links = doc.querySelectorAll('.result__a');
+    const snips = doc.querySelectorAll('.result__snippet');
+    const items = [];
+    for (let i = 0; i < links.length && items.length < 5; i++) {
+      const href = links[i].getAttribute('href') || '';
+      const title = (links[i].textContent || '').trim();
+      const snip = snips[i] ? (snips[i].textContent || '').trim() : '';
+      if (!title) continue;
+      // Реальный URL часто зашит вquery-параметре uddg
+      let real = href;
+      try {
+        const u = new URL(href, 'https://html.duckduckgo.com');
+        real = u.searchParams.get('uddg') || href;
+      } catch (e) { /* оставляем как есть */ }
+      if (!/^https?:\/\//i.test(real)) real = 'https://' + real.replace(/^\/\//, '');
+      items.push({ title, snip, url: real });
+    }
+    if (!items.length) throw new Error('empty');
+    const htmlOut = '<div><b>🔎 Результаты поиска: ' + esc(query) + '</b></div>' +
+      items.map((it) =>
+        '<div class="search-item"><a class="search-link" target="_blank" rel="noopener noreferrer" href="' +
+        esc(it.url) + '">' + esc(it.title) + '</a>' +
+        '<div class="snip">' + esc(it.snip) + '</div></div>').join('');
+    aiAnswerFn(elDiv(htmlOut), 100);
+  } catch (e) {
+    // Чаще всего падает на CORS — браузер не может читать ответ html.duckduckgo.com.
+    aiAnswerFn(elDiv(
+      '<div><b>🔎 Поиск не удался</b><br/>' +
+      'Скорее всего запрос к html.duckduckgo.com заблокирован политикой CORS ' +
+      '(браузер не может прочитать ответ стороннего сайта без специального заголовка).<br/><br/>' +
+      'Что можно сделать:<br/>' +
+      '• Открыть поиск вручную: <a class="search-link" target="_blank" rel="noopener noreferrer" href="https://duckduckgo.com/?q=' +
+      encodeURIComponent(esc(query)) + '">ddg?' + esc(query) + '</a><br/>' +
+      '• Запустить Chrome с флагом <code>--disable-web-security</code> (только для разработки!)<br/>' +
+      '• Добавить прокси/CORS-мост на сервере (в этой демо-версии сознательно не используется).</div>'
+    ), 200);
+  } finally {
+    busy.remove();
+  }
+}
+
+/* ============================ Диспетчер команд ============================ */
+
+function handle(text, aiAnswerFn) {
+  const t = text.trim();
+  const low = t.toLowerCase();
+
+  // --- 3D (латинская «d» и кириллическая «д», опциональные кавычки) ---
+  let m = low.replace(/д/g, 'd').replace(/["'«»]/g, '').match(/^3d\s*(куб|сфера|цилиндр|конус|тор)(?![a-zа-я])\s*$/);
+  if (m) {
+    const node = make3D(m[1]);
+    if (node) { aiAnswerFn(node); return true; }
+  }
+
+  // --- Таблицы ---
+  m = low.match(/^таблица\s*(бюджет|оценк\w*|населени\w*)?/);
+  if (m) {
+    const key = !m[1] || m[1].startsWith('бюджет') ? 'budget'
+      : m[1].startsWith('оценк') ? 'grades' : 'population';
+    const node = buildTable(key);
+    if (node) { aiAnswerFn(node); return true; }
+  }
+
+  // --- Поиск ---
+  m = t.match(/^(?:поиск|найди|ищи|google|ddg)\s+(.+)$/i);
+  if (m) { webSearch(m[1].trim(), aiAnswerFn); return true; }
+
+  // --- График: «график sin(x) от -5 до 5» / «график x^2» ---
+  m = t.match(/^график\s+(.+?)(?:\s+от\s+(-?\d+[.,]?\d*)\s+до\s+(-?\d+[.,]?\d*))?$/i);
+  if (m) {
+    const expr = m[1].replace(/^y\s*=\s*/i, '');
+    const from = m[2] !== undefined ? parseFloat(m[2]) : -5;
+    const to = m[3] !== undefined ? parseFloat(m[3]) : 5;
+    aiAnswerFn(makeGraph(expr, from, to));
+    return true;
+  }
+
+  // --- Производная: «производная x^2» или «производная sin(x) при x=0» ---
+  m = t.match(/^производная\s+(.+?)\s*(?:при\s+x\s*=?\s*([-+]?\d+[.,]?\d*))?$/i);
+  if (m) {
+    let expr = m[1].trim();
+    const mm2 = expr.match(/^\((.*)\)$/); // снять ОДНИ внешние скобки: (sin(x)) -> sin(x)
+    if (mm2) expr = mm2[1];
+    if (m[2] !== undefined) {
+      try {
+        const fn = compileExpr(expr);
+        const h = 1e-5, xv = parseFloat(m[2]);
+        const d = (fn(xv + h) - fn(xv - h)) / (2 * h);
+        aiAnswerFn(elDiv('<pre class="codeblk">f(x) = ' + esc(expr) + '\nf′(' + fmtNum(xv) + ') ≈ ' + fmtNum(d, 8) + '</pre>' +
+          '<div class="res">f′(' + fmtNum(xv) + ') = ' + fmtNum(d, 6) + '</div>'));
+      } catch (e) {
+        aiAnswerFn(elDiv('<span style="color:#ff7b9c">Ошибка: ' + esc(e.message || e) + '</span>'));
+      }
+    } else {
+      aiAnswerFn(derivativeCalc(expr));
+    }
+    return true;
+  }
+
+  // --- Интеграл: «интеграл x^2 от 0 до 3» ---
+  m = t.match(/^интеграл\s+(.+?)\s+от\s+(-?\d+[.,]?\d*)\s+до\s+(-?\d+[.,]?\d*)$/i);
+  if (m) {
+    aiAnswerFn(integralCalc(m[1].trim(), parseFloat(m[2]), parseFloat(m[3])));
+    return true;
+  }
+
+  // --- Значение функции: «sin(x) при x=1» ---
+  m = t.match(/^(.+?)\s+при\s+x\s*=\s*([-+]?(?:\d+(?:[.,]\d*)?|\.\d+|pi(?:\s*\/\s*2)?))$/i);
+  if (m) {
+    let xv = m[2].toLowerCase().replace(',', '.');
+    let xVal;
+    if (xv.startsWith('pi')) {
+      xVal = xv === 'pi' ? Math.PI : xv.includes('/') ? Math.PI / 2 : Math.PI;
+    } else xVal = parseFloat(xv);
+    aiAnswerFn(valueAt(m[1].trim(), xVal));
+    return true;
+  }
+
+  // --- Уравнения: «реши ...», «x-3=2» или голый запрос вида A=B ---
+  const eqCmd = t.match(/^(?:реши|уравнение|реши уравнение)\s+(.+)$/i);
+  const eqBody = eqCmd ? eqCmd[1] : null;
+  const looksEquation = /=/.test(t) && /[xх]/i.test(t) && !/^график|^производная|^интеграл/i.test(low);
+
+  if (eqBody || looksEquation) {
+    const eq = String(eqBody || t).replace(/х/g, 'x'); // русская «х» → латинская
+    const isQuad = /\bx\s*\^\s*2|x\^2/i.test(eq) &&
+      (() => { try { const [, p2] = eq.split('='); const L = compileExpr(eq.split('=')[0]); const R = compileExpr(p2); const F = (x) => L(x) - R(x); return Math.abs(quadCoefs(F).A) > 1e-12; } catch (e) { return false; } })();
+    const res = isQuad ? solveQuadratic(eq) : solveLinear(eq);
+    aiAnswerFn(renderSteps(res, isQuad ? '🟡 Квадратное уравнение: ' + eq : '➗ Линейное уравнение: ' + eq));
+    return true;
+  }
+
+  // --- Справочник формул (по ключевым словам) ---
+  if (/форму|теорем|площадь|объем|объём|прогресси|логарифм|тригонометр|пифагор|виета|круг|треугольник/.test(low)) {
+    const node = lookupFormula(low);
+    if (node) { aiAnswerFn(node); return true; }
+  }
+
+  // Привет/помощь
+  if (/^(привет|здравств|хай|help|помощь|что ты умеешь)/i.test(low)) {
+    aiAnswerFn(elDiv(
+      '<div>Я умею:<br/>' +
+      '• <span class="res">реши 5(x-3)=2x+6</span> — линейные уравнения с шагами<br/>' +
+      '• <span class="res">реши x^2-5x+6=0</span> — квадратные с дискриминантом<br/>' +
+      '• <span class="res">график sin(x) от -5 до 5</span> — графики на canvas<br/>' +
+      '• <span class="res">производная x^2</span>, <span class="res">интеграл x^2 от 0 до 3</span><br/>' +
+      '• <span class="res">sin(x) при x=1</span> — значение функции<br/>' +
+      '• <span class="res">теорема пифагора</span> — справочник формул<br/>' +
+      '• <span class="res">таблица бюджет</span> / <span class="res">оценки</span> / <span class="res">население</span> + CSV<br/>' +
+      '• <span class="res">3D куб|сфера|цилиндр|конус|тор</span> — Three.js сцена<br/>' +
+      '• <span class="res">поиск …</span> — веб-поиск через DuckDuckGo</div>'));
+    return true;
+  }
+
+  return false; // не команда — обычное сообщение в мультиплеер
+}
+
+window.NM_BOT = { handle };
+</script>
+</body>
+</html>

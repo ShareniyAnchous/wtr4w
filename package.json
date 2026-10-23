@@ -12,14 +12,18 @@
     "@dnd-kit/sortable": "^8.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@supabase/supabase-js": "^2.98.0",
+    "bcryptjs": "^3.0.3",
     "canvas-confetti": "^1.9.3",
     "date-fns": "^2.30.0",
+    "express": "^5.3.0",
+    "express-session": "^1.19.0",
     "framer-motion": "^11.16.1",
     "lucide-react": "^0.294.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.8.0",
     "recharts": "^2.10.0",
+    "socket.io": "^4.8.4",
     "uuid": "^9.0.1"
   },
   "devDependencies": {
